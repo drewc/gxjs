@@ -1,0 +1,20 @@
+{
+  "name": "gxjs",
+  "version": "0.1.1",
+  "description": "GxJS: Scheme runtime for Gerbil/Gambit",
+  "main": "gxjs.js",
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "MIT",
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "fs": "^0.0.1-security",
+    "os": "^0.1.1",
+    "process": "^0.11.10",
+    "vm": "^0.1.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.11.0",
+    "webpack-cli": "^4.2.0"
+  }
+}

@@ -1,0 +1,54 @@
+#+TITLE: Webpack
+
+#+begin_quote
+At its core, webpack is a static module bundler for modern JavaScript
+applications. When webpack processes your application, it internally builds a
+dependency graph which maps every module your project needs and generates one or
+more bundles.
+
+—https://webpack.js.org/concepts/
+#+end_quote
+
+* Introduction
+
+I really want to play nice with the JavaScript community. But, I develop in
+*Gerbil*, *a meta-dialect of Scheme with post-modern features*[fn:ge], which
+transpiles to the *Gambit programming system*[fn:ga], which has a universal
+backend the compiles to *JavaScript*.
+
+Packing them all togeher is somewhat the point of this project, and the primary
+focus is the *InterWebs*. Pack, Web ... ~webpack~!
+
+#+begin_src shell
+yarn init
+yarn add webpack webpack-cli --dev
+
+yarn add os fs vm process
+yarn run webpack
+
+#+end_src
+
+* ~webpack.config.js~
+
+#+begin_src javascript :tangle "../webpack.config.js"
+module.exports = {
+  entry: './gxjs.js',
+  stats: {
+    logging: 'verbose'
+  },
+  //node: { fs: 'empty' },
+  target: 'web'
+};
+#+end_src
+
+
+
+* Footnotes
+
+[fn:ga]
+#+begin_quote
+The Gambit programming system is a full implementation of the Scheme language which conforms to the R4RS, R5RS and IEEE Scheme standards. It consists of two main programs: gsi, the Gambit Scheme interpreter, and gsc, the Gambit Scheme compiler.
+— http://www.iro.umontreal.ca/~gambit/doc/gambit.html
+#+end_quote
+
+[fn:ge] https://cons.io/

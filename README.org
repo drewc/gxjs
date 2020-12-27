@@ -1,0 +1,21 @@
+#+TITLE: GxJs: A runtime for Scheme, in JavaScript
+
+"One lang to rule them all and in parens let bind them."
+
+* Introduction
+
+I tend to forget the differing syntax and semantics amoung the billions[fn:1] of
+programming languages I need to read or write overy month.
+
+Sometimes a meta-layer on top is just the thing I find very sexp.
+
+* Features
+
+ - Most of ~R7RS~
+ - *Gerbil*'s ~def~
+ - Small minimized runtime and lazy-loading of larger ~(features)~
+
+
+* Footnotes
+
+[fn:1] Ok, likely under 15 or so. But still!

@@ -1,0 +1,5439 @@
+#+TITLE: R7RS runtime, in JavaScript
+#+DATE:<2020-12-19 Sat 09:00>--<2020-12-24 Thu>
+
+While we certainly need more than ~R7RS~ it is a wonderful basis to begin with.
+Here goes.
+
+* R7RS and ~(scheme base)~ as a minimal goal
+
+To start with, *Gambit* and *Gerbil* like almost all lisps are implemented in
+themselves. But I need a goal to work towards. ~R7RS-small~ has the library
+~(scheme base)~ which contains enough symbols to work towards.
+
+
+- ~*~ ~+~ ~-~ ~/~ ~<=~ ~=~  ~>~ ~>=~ ~<~  [[#minNums][~min/nums.scm~]]
+
+- ~_~ ~=>~ ~...~ automagic
+
+- ~abs~ yup.
+
+- ~and~ automagic
+
+- ~append~   [[#minList][~min/list.scm~]]
+
+- ~apply~ [[*~gxjs-minlib~][~gxjs-minlib~]]
+
+- ~assoc~  ~assq~ ~assv~   [[#minList][~min/list.scm~]]
+
+- ~begin~ automagic
+
+- ~binary-port?~ not yet
+
+ - ~boolean=?~ ~boolean?~ [[#minEquality][~min/equality.scm~]]
+
+ - ~bytevector~ ~bytevector-append~ ~bytevector-copy~ ~bytevector-copy!~
+   ~bytevector-length~ ~bytevector-u8-ref~ ~bytevector-u8-set!~ ~bytevector?~
+   yes, in [[#minVector][~min/vector.scm~]].
+
+ - ~caar~ ~cadr~   [[#minList][~min/list.scm~]]
+
+ - ~call-with-current-continuation~ ~call-with-port~ ~call-with-values~ ~call/cc~
+  not yet
+
+ - ~car~  [[#minList][~min/list.scm~]]
+ - ~case~  automagic
+ - ~cdar~ ~cddr~ ~cdr~ [[#minList][~min/list.scm~]]
+ - ~ceiling~ automagic
+ - ~char->integer~ [[#minChar][~min/char.scm~]]
+ - ~char-ready?~ No ports yet?
+ - ~char<=?~ ~char<?~ ~char=?~ ~char>=?~  ~char>?~ ~char?~ [[#minChar][~min/char.scm~]]
+
+ - ~close-input-port~ ~close-output-port~ ~close-port~
+   Have not even tried ports to be honest.
+
+ - ~complex?~     [[#minNums][~min/nums.scm~]]
+ - ~cond~ ~cond-expand~ ~cons~  automagic
+ - ~current-error-port~      ~current-input-port~ ~current-output-port~
+   There must be ports somewhere!
+ - ~define~ automagic
+ - ~define-record-type~ automagic but uses [[#minStruct][~min/structure.scm~]]
+
+ - ~define-syntax~ automagic ... the compiler handles syntax
+
+ - ~define-values~ May work at compile time, but certainly not in a lambda.
+
+ - ~denominator~ automagic it seems
+ - ~do~ Yup! automagic. Syntax rules.
+ - ~dynamic-wind~ nope, not yet.
+ - ~else~ yes, else works for case and cond.
+ - ~eof-object~ ~eof-object?~  Yup!! No idea where, so automagic.
+ - ~eq?~ ~equal?~ ~eqv?~ yup.
+
+ - ~error~ ~error-object-irritants~ ~error-object-message~ ~error-object?~
+
+  No idea, but currently I'll say no. No idea. I tried, so certainly know I
+  have no idea.
+
+ - ~even?~   yup.
+ - ~exact~ ~exact-integer-sqrt~ not yet
+ - ~exact-integer?~ ~exact?~ yup.   [[#minNums][~min/nums.scm~]]
+ - ~expt~    [[#minNums][~min/nums.scm~]]
+ - ~features~  ~file-error?~ nope.
+ - ~floor~  ~floor-quotient~ ~floor-remainder~  ~floor/~
+ - ~flush-output-port~ no ports ... I don't think. Totally untested.
+
+ - ~for-each~ yup!
+ - ~gcd~    [[#minNums][~min/nums.scm~]]
+ - ~get-output-bytevector~ ~get-output-string~ no ports
+ - ~guard~ Not yet. Error cannot find 24. I know this one.
+
+ - ~if~ built inc
+ - ~include~ ~include-ci~ kind of
+ - ~inexact~ ~inexact?~ not yet
+ - ~input-port-open?~ no ports
+ - ~input-port?~ no ports yet I don't think.
+ - ~integer->char~ no Idea but works. char.scm perhaps.
+ - ~integer?~  yup!
+ - ~lambda~ automagic
+ - ~lcm~    done!
+ - ~length~  [[#minList][~min/list.scm~]]
+ - ~let~  ~let*~ automagic
+ - ~let*-values~  it does not appear so
+ - ~let-syntax~ ~let-values~ nope
+ - ~letrec~ ~letrec*~  yup!
+ - ~letrec-syntax~ not even going to try
+ - ~list~  automagic
+ - ~list->string~ yes!
+ - ~list->vector~   yup!
+ - ~list-copy~ ~list-ref~ ~list-set!~ ~list-tail~  ~list?~    [[#minList][~min/list.scm~]]
+ - ~make-bytevector~ yup.
+ - ~make-list~ yup!
+ - ~make-parameter~ yes!
+ - ~make-string~ w00t!
+ - ~make-vector~  w00h00!
+ - ~map~ auto, I think.
+ - ~max~ yup.
+ - ~member~ ~memq~ ~memv~ for sure
+ - ~min~ yup
+ - ~modulo~ total
+ - ~negative?~  yup
+ - ~newline~ not even trying. No ports yet.
+ - ~not~ Built in
+ - ~null?~ yup. Likely list.scm
+ - ~number->string~  ~number?~   [[#minNums][~min/nums.scm~]]
+ - ~numerator~ yup, sorta, like all number thingies
+ - ~odd?~ yup.
+ - ~open-input-bytevector~ ~open-input-string~ ~open-output-bytevector~
+   ~open-output-string~ No ports, right?
+
+ - ~or~  auto
+ - ~output-port-open?~ ~output-port?~ no ports yet AFAIK.
+ - ~pair?~ yup.
+ - ~parameterize~  Yes!
+ - ~peek-char~ ~peek-u8~ ~port?~ Still no ports. Soontime!
+ - ~positive?~   yup
+ - ~procedure?~ uhuh
+ - ~quasiquote~ so far so good
+ - ~quote~ of course.
+ - ~quotient~  yes
+ - ~raise~ ~raise-continuable~ not yet.
+ -  ~rational?~ yup! No idea where.
+ - ~rationalize~  not yet
+ - ~read-bytevector~ ~read-bytevector!~ ~read-char~ ~read-error?~~read-line~
+  ~read-string~ ~read-u8~ no ports
+
+ - ~real?~ Yup!
+ - ~remainder~ yes
+ - ~reverse~  for sure
+ - ~round~ yes
+ - ~set!~  positive
+ - ~set-car!~ ~set-cdr!~ yes
+
+ - ~square~ uhuh
+ - ~string~ ~string->list~ Yup!
+ - ~string->number~   [[#minNums][~min/nums.scm~]]
+ - ~string->symbol~  Yup! I think this is in [[#minChar][~min/symkey.scm~]]
+ - ~string->utf8~ works.
+ - ~string->vector~ ~string-append~  ~string-copy~ ~string-copy!~ ~string-fill!~ ~string-for-each~         ~string-length~ ~string-map~ ~string-ref~ ~string-set!~ ~string<=?~ ~string<?~   ~string=?~ ~string>=?~ ~string>?~ ~string?~ ~substring~
+
+
+ - ~symbol->string~ ~symbol=?~ ~symbol?~  [[#minChar][~min/symkey.scm~]] I think.
+
+ - ~syntax-error~ no idea.
+ - ~syntax-rules~ yup
+ - ~textual-port?~ no ports
+
+ - ~truncate~ ~truncate-quotient~ ~truncate-remainder~ yup
+ - ~truncate/~ is working but let-values is not ... I think.
+ - ~u8-ready?~  no ports
+ - ~unless~ got it.
+ - ~unquote~ ~unquote-splicing~ automagic
+ - ~utf8->string~  yup.
+ - ~values~ yes! Need to go back as I get values-ref working.
+ - ~vector~                  ~vector->list~ ~vector->string~          ~vector-append~ ~vector-copy~             ~vector-copy!~ ~vector-fill!~            ~vector-for-each~ ~vector-length~           ~vector-map~ ~vector-ref~              ~vector-set!~ ~vector?~
+      Yeah!!
+ - ~when~ yup.
+ - ~with-exception-handler~ Yes!!
+ - ~write-bytevector~ ~write-char~ ~write-string~ ~write-u8~
+   have not tried ports
+
+ - ~zero?~
+
+#+begin_src scheme :tangle "../test/r7rs-test.scm"
+(define (test> name i pred j)
+  (let ((res (pred i j)))
+    (if res
+      (##inline-host-statement
+       "try {
+          console.log('Success!', g_scm2host(@1@), g_scm2host(@2@));
+        } catch {
+         console.log('Made it!', g_scm2host(@1@), (@2@));
+       };"
+       name i)
+      (##inline-host-statement
+       " try {
+            console.error('failed :(', g_scm2host(@1@), g_scm2host(@2@), 'not predicated', g_scm2host(@3@), (@3@), (@2@));
+        } catch {
+          console.error('total fail', g_scm2host(@1@), (@2@), (@3@))
+        }"
+       name i j))))
+
+(define (test-r7rs)
+  (test> "1 + 1 + 1 using + =" (+ 1 1 1) = 3)
+  (test> "1 + 1 + 1.5 using + =" (+ 1 1 1.5) = 3.5)
+  (test> "2 x 2 x 2 using * =" (* 2 2 2) = 8)
+  (test> "1 / 2 using / =" (/ 1 2) = 0.5)
+  (test> "2-1.5-.5 using - =" (- 2 1.5 .5) = 0)
+  (test> "0 = 0 " 0 = 0)
+  (test> "2 < 3 < 4 using < eq? #t " (< 2 3 4) eq? #t)
+  (test> "2 > 1 > 0 using > eq? #t " (> 2 1 0) eq? #t)
+  (test> "2 <= 3 <= 3 using <= eq? #t " (<= 2 3 3) eq? #t)
+  (test> "3 >= 3 >= 1 using >= eq? #t " (>= 3 3 1) eq? #t)
+
+  (test> "abs(1.5)" (abs -1.5) = 1.5)
+  (test> "and is auto? and #t #t 42" (and #t #t 42) = 42)
+  (test> "append works" (append '(1) '(4) '(2)) equal? '(1 4 2))
+  (test> "Assoc 1 ((1 . 42) (6 . 2))'"
+         (assoc 1 '((1 . 42) (6 . 2))) equal? '(1 . 42))
+  (test> "Assq 'one ((one . 42) (6 . 2))'"
+         (assq 'one '((one . 42) (6 . 2))) equal? '(one . 42))
+  (test> "Assv 'one ((one . 42) (6 . 2))'"
+         (assv 'one '((one . 42) (6 . 2))) equal? '(one . 42))
+  (test> "begin works" (begin '(1) '(4) 42) = 42)
+  (test> "boolean=?" (boolean=? #t #t #t) eq? #t)
+  (test> "boolean=? fail" (boolean=? #t #f #t) eq? #f)
+  (test> "boolean? #t" (boolean? #t) eq? #t)
+  (test> "boolean? #f" (boolean? #f) eq? #t)
+  (test> "boolean? 'foo" (boolean? 'foo) eq? #f)
+  (test> "bytevector" (let* ((b (bytevector 4))
+                             (v (bytevector 2))
+                             (bv (bytevector-append b v))
+                             (a (bytevector-copy b))
+                             (u (bytevector 4 0))
+                             (_ (bytevector-copy! u 1 (bytevector 4 2 0) 1 2))
+                             (l (bytevector-length u))
+                             (four (bytevector-u8-ref bv 0))
+                             (_ (bytevector-u8-set! v 0 42)))
+
+                        (list
+                         (bytevector? bv)
+                         (equal? bv (bytevector 4 2))
+                         (equal? v (bytevector 42))
+                         (equal? a b)
+                         (equal? u bv)
+                         (= 2 l)
+                         (= 4 four)))
+         equal? '(#t #t #t #t #t #t #t))
+
+
+  (test> "caar ((42))" (caar '((42))) = 42)
+  (test> "cadr (41 42)" (cadr '(41 42)) = 42)
+  #;(##inline-host-statement "console.error(@1@)" (call-with-values (lambda (a b c) a) (values 1 2 3)))
+
+  (test> "car (42)" (car '(42)) = 42)
+  (test> "case?" (case 'foo
+                   ((foo) 42)
+                   (else 0)) = 42)
+  (test> "cdar ((1 . 42))" (cdar '((1 . 42))) = 42)
+  (test> "cddr (0 1 . 42)" (cddr '(0 1 . 42)) = 42)
+  (test> "cdr (1 . 42)" (cdr '(1 . 42)) = 42)
+  (test> "ceiling 41.42" (ceiling 41.42) = 42)
+  (test> "char->integer #\\*" (char->integer #\*) = 42)
+   ;; char-ready?
+  (test> "char<=? #\\a #\\b #\\b #\\c" (char<=? #\a #\b #\b #\c) eq? #t)
+  (test> "char<? #\\a #\\b #\\c" (char<? #\a #\b  #\c) eq? #t)
+  (test> "char=? #\\a #\\b => #f" (char=? #\a #\b) eq? #f)
+  (test> "char=? #\\a #\\a => #t" (char=? #\a #\a) eq? #t)
+  (test> "char>=? #\\a #\\b #\\c => #f" (char>=? #\a #\b  #\c) eq? #f)
+  (test> "char>? #\\a #\\b #\\c => #f" (char>? #\a #\b  #\c) eq? #f)
+  (test> "char? #\\a" (char? #\a) eq? #t)
+  (test> "char? 42 => #f" (char? 42) eq? #f)
+
+  (test> "complex? 42" (complex? 42) eq? #t)
+
+  (test> "cond" (cond ((= 42 42.0) 42) (else 0))= 42)
+  (test> "cond else" (cond ((= 42 42.1) 42) (else 0)) equal? 0)
+  (test> "cond-expand" (cond-expand (foo 41) (else 42)) = 42)
+
+  (test> "cons" (cons 4 2) equal? '(4 . 2))
+  ;;(##inline-host-statement "console.error(g_scm2host(@1@))" '(("make" . "me") ("an" . "object")))
+
+  (test> "define" ((lambda () (define n 42) (define (en) n) (en))) = 42)
+  ;; Works but needs structs
+  (test> "define-record-type"
+         ((lambda ()
+            (define-record-type <pare>
+              (kons x y)
+              pare?
+              (x kar set-kar!)
+              (y kdr)) (kar (kons 42 0)))
+          )
+         = 42)
+  (test> "define-syntax"
+         ((lambda ()
+            (define-syntax %when
+              (syntax-rules ()
+                ((%when test result1 result2 ...)
+                 (if test
+                   (begin result1 result2 ...)))))
+
+            (%when #t 42)))
+         = 42)
+
+  ;; (test> "define-values" ((lambda () (define-values (b a) (values 42 42)) a)) eq? 42)
+
+  (test> "denominator 1/2" (denominator 1/2) = 2)
+
+  (test> "do" (do ((vec (make-vector 5))
+                   (i 0 (+ i 1)))
+                  ((= i 5) vec)
+                (vector-set! vec i i))
+         equal? #(0 1 2 3 4))
+
+  ;; (test> "dynamic-wind" (dynamic-wind (lambda () 41) (lambda () 42) (lambda () 43)) = 42)
+  (test> "eof object" (eof-object? (eof-object)) eq? #t)
+  (test> "eq? 12 12.0 => #f" (eq? 12 12.0) eq? #f)
+  (test> "eq? 'this 'this  => #t" (eq? 'this 'this) eq? #t)
+  (test> "eqv? 12 12.0 => #f" (eqv? 12 12.0) eq? #f)
+  (test> "eqv? 12 12 => #t" (eqv? 12 12) eq? #t)
+  (test> "equal? 12 12.0 => #f" (equal? 12 12.0) eq? #f)
+  (test> "equal? \"12\" \"12\" => #t" (equal? "12" "12") eq? #t)
+  ;; (test> "error" (error "Does error work?") eq? #t)
+  (test> "even? 12 => #t" (even? 12) eq? #t)
+  ;; (test> "(exact 0.5) => 1/2)" (exact 0.5) equal? 1/2)
+  (test> "(exact-integer? 0.5) => #f)" (exact-integer? 0.5) eq? #f)
+  ;; (test> "(exact-integer-sqrt r5) => #t)" (exact-integer-sqrt 5) eq? #t)
+  (test> "(exact? 5) => #t)" (exact? 5) eq? #t)
+  (test> "(exact? 42.6666) => #f)" (exact? 42.666) eq? #f)
+  (test> "(exact? 1/3) => #t)" (exact? 1/3) eq? #t)
+  (test> "(expt 2 2) => 4)" (expt 2 2) = 4)
+  ;; (test> "(list? (features)) => #t)" (list? (features)) eq? #t)
+  (test> "(floor 3/2) => 1)" (floor 3/2) = 1)
+  (test> "(floor-quotient 5 2) => 2)" (floor-quotient 5 2) = 2)
+  (test> "(floor-remainder 5 2) => 1)" (floor-remainder 5 2) = 1)
+  (test> "for-each" ((lambda ()
+                       (define n 0)
+                       (for-each (lambda (k) (set! n k))
+                                 '(1 2 3 42))
+                       n)) = 42)
+  (test> "(gcd 5 2) => 1)" (##gcd 5 2) = 1)
+  #;(test> "guard" (guard (condition
+                         ((assq ’a condition) => cdr)
+                         ((assq ’b condition)))
+                   (raise (list (cons ’a 42))))
+         = 42)
+
+  (test> "integer->char" (integer->char 42) equal? #\*)
+  (test> "integer? 42" (integer? 42) eq? #t)
+  (test> "integer? 42.42" (integer? 42.42) eq? #f)
+
+  ;(raise (list (cons a 42)))
+
+  (test> "lcm 2 7" (lcm 2 7) eq? 14)
+  (test> "let" (let ((a 20) (b 20) (c 2)) (+ a b c)) = 42)
+  (test> "let*" (let* ((a 20) (b (+ a 20)) (c (+ b 2))) c) = 42)
+  #;(test> "let*-values" (let*-values (((a b) (values 20 1))
+                                     ((x y) (values a b)))
+                         (+ a b x y)) = 42)
+
+  #;(test> "let-syntax" (let ((x ’outer))
+                        (let-syntax ((m (syntax-rules () ((m) x))))
+                          (let ((x ’inner))
+                            (m)))) eq? 'outer)
+
+  (test> "letrec" (letrec ((even?
+                            (lambda (n)
+                              (if (zero? n)
+                                #t
+                                (odd? (- n 1)))))
+                           (odd?
+                            (lambda (n)
+                              (if (zero? n)
+                                #f
+                                (even? (- n 1))))))
+                    (even? 88))
+         eq? #t)
+
+  (test> "letrec*" (let ((x 5))
+                     (letrec* ((foo (lambda (y) (bar x y)))
+                               (bar (lambda (a b) (+ (* a b) a))))
+                       (foo (+ x 3)))) = 45)
+
+  (test> "list" (list 4 2) equal? '(4 2))
+  (test> "list->string" (list->string '(#\4 #\2)) equal? "42")
+  (test> "list->vector" (list->vector '(4 2)) equal? (vector 4 2))
+  (test> "list-copy" (list-copy (list 4 2)) equal? '(4 2))
+  (test> "list-ref" (list-ref (list 4 2 42) 2) equal? 42)
+  (test> "list-set!" (let ((lst (list 4 2 3)))
+                      (list-set! lst 2 42)
+                      (list-ref lst 2)) equal? 42)
+  (test> "list-tail" (list-tail '(1 2 3) 2) equal? '(3))
+  (test> "list?" (list (list? '(1 2 3)) (list? '()) (list? 2)) equal? '(#t #t #f))
+
+  (test> "make-bytevector" (make-bytevector 4 2) equal? (make-bytevector 4 2))
+  (test> "make-list" (make-list 4 2) equal? '(2 2 2 2))
+  (test> "make-parameter" ((lambda () (define p (make-parameter 42))
+                             (p))) = 42)
+
+  (test> "make-string" (make-string 4 #\2) equal? "2222")
+  (test> "make-vector" (make-vector 4 2) equal? #(2 2 2 2))
+  (test> "map" (map (lambda (n) (+ 1 n)) '(3 1)) equal? '(4 2))
+  (test> "max" (max 41 42 39 38) = 42)
+  (test> "member" (car (member "1" '("1" 3 4))) equal? "1")
+  (test> "memq" (car (memq 'fourtwo '("1" 3 fourtwo 4))) equal? 'fourtwo)
+  (test> "memv" (car (memv 4 '("1" 3 fourtwo 4))) equal? 4)
+  (test> "min" (min 141 42 339 358) = 42)
+  (test> "modulo" (modulo 4 3) = 1)
+  (test> "negative?" (negative? -3) eq? #t)
+  (test> "not" (not #f) eq? #t)
+  (test> "null?" (null? '()) eq? #t)
+  (test> "number->string" (number->string 42) equal? "42")
+  (test> "numerator" (numerator 1/2) = 1)
+  (test> "odd? 42" (odd? 42) eq? #f)
+  (test> "odd? 41" (odd? 41) eq? #t)
+  (test> "or 42" (or (odd? 40) #f 42) = 42)
+  (test> "pair?" (list (pair? 1) (pair? '(1))) equal? '(#f #t))
+  (test> "parameterize yay!" ((lambda () (define p (make-parameter 41))
+                            (parameterize ((p 42)) (p)))) = 42)
+
+  (test> "positive?" (list (positive? -1) (positive? 42)) equal? '(#f #t))
+  (test> "procedure?" (list (procedure? -1) (procedure? list)) equal? '(#f #t))
+  (test> "quasiquote" (quasiquote (life the universe and everyhing))
+         equal? '(life the universe and everyhing))
+  (test> "quote" (quote (life the universe and everyhing))
+         equal? '(life the universe and everyhing))
+
+  (test> "quotient" (quotient 84 2) = 42)
+  ;d; No raise yet
+  (test> "rational?" (list (rational? 1) (rational? 1/2) (rational? -inf.0)) equal? '(#t #t #f))
+  #;(test> "rationalize" (rationalize .3 1/10) = #t )
+  (test> "real?" (list (real? 1) (real? 1/2)) equal? '(#t #t))
+
+  (test> "remainder" (remainder 42 9) = 6)
+  (test> "reverse" (reverse '(2 4)) equal? '(4 2))
+  (test> "round" (round 41.7) = 42)
+
+  (test> "set!" (let ((a 1)) (set! a 42) a) = 42)
+  (test> "set-car!" (let ((a (list 1 2))) (set-car! a 42) a) equal? '(42 2))
+  (test> "set-cdr!" (let ((a (list 1 2))) (set-cdr! a 42) a) equal? '(1 . 42))
+
+  (test> "square" (square 2) = 4)
+
+  (test> "string" (string #\*) equal? "*")
+  (test> "string->list" (string->list "42") equal? (list #\4 #\2))
+  (test> "string->number" (string->number "42") = 42)
+  (test> "string->symbol" (string->symbol "42") eq? '|42|)
+  (test> "string->utf8" (bytevector-u8-ref (string->utf8 "*") 0) eq? 42)
+  (test> "string->vector" (string->vector "42") equal? (vector #\4 #\2))
+  (test> "string-append" (string-append "4" "2") equal? "42")
+  (test> "string-copy" (string-copy "42") equal? "42")
+  (test> "string-copy!" ((lambda ()
+                           (define a "42345")
+                           (define b (string-copy "abcde"))
+                           (string-copy! b 1 a 0 2)
+                           b))
+         equal? "a42de")
+  (test> "string-fill!" (let ((str "0242"))
+                          (string-fill! str #\4 0 1) str)
+         equal? "4242")
+  (test> "string-for-each" (let ((lst '()))
+                             (string-for-each (lambda (c) (set! lst (cons c lst)))
+                                              "24")
+                             lst)
+         equal? (list #\4 #\2))
+  (test> "string-length" (string-length (make-string 42 #\0)) = 42)
+  (test> "string-ref" (string-ref "42" 0) eqv? #\4)
+  (test> "string-set!" ((lambda () (define str "02") (string-set! str 0 #\4) str))
+         equal? "42")
+  (test> "string<=?" (list (string<=? "42" "42") (string<=? "41" "42") (string<=? "43" "42"))
+         equal? '(#t #t #f))
+  (test> "string<?" (list (string<? "42" "42") (string<? "41" "42") (string<? "43" "42"))
+         equal? '(#f #t #f))
+  (test> "string>?" (list (string>? "42" "42") (string>? "41" "42") (string>? "43" "42"))
+         equal? '(#f #f #t))
+
+  (test> "string>=?" (list (string>=? "42" "42") (string>=? "41" "42") (string>=? "43" "42"))
+         equal? '(#t #f #t))
+  (test> "substring" (substring "0420" 1 3) equal? "42")
+
+  (test> "symbol->string" (symbol->string '|42|) equal? "42")
+  (test> "symbol=?" (list (symbol=? '|42|'|42| '|42|)
+                          (symbol=? '|42|'|42| 'nope))
+         equal? '(#t #f))
+  (test> "symbol?" (list (symbol?  '|42|)
+                          (symbol? 42))
+         equal? '(#t #f))
+
+  (test> "syntax-rules" ((lambda ()
+                           (define-syntax be-like-begin
+                             (syntax-rules ()
+                               ((be-like-begin name)
+                                (define-syntax name
+                                  (syntax-rules ()
+                                    ((name expr (... ...))
+                                     (begin expr (... ...))))))))
+                           (be-like-begin foo)
+                           (foo 12 34 42)
+                           )) = 42)
+
+  (test> "truncate" (list (truncate -4.3) (truncate 3.5)) equal? '(-4.0 3.0))
+  (test> "truncate-quotient" (list (truncate-quotient 4 2) (truncate-quotient 7 5)) equal? '(2 1))
+  (test> "truncate-remainder" (list (truncate-remainder 4 2) (truncate-remainder 7 5)) equal? '(0 2))
+
+  #;(test> "truncate/" ((lambda () 1
+                        (let-values (((q r) (truncate/ 7 5))
+                          (list q r))
+                        ))) equal? '( 1 2))
+
+  (test> "Unless" (unless #f 42) = 42)
+  (test> "unquote and splicing" (quasiquote ((unquote 4) (unquote-splicing '(2))))
+         equal? '(4 2))
+  (test> "utf8->string" (utf8->string (bytevector 52 50)) equal? "42")
+
+  (test> "values" (##values->list (values 4 2)) equal? '(4 2))
+
+  (test> "vector"
+         (let* ((v (vector 42 4 2))
+               (lst (vector->list v))
+               (sv (vector #\4 #\2))
+               (str (vector->string sv))
+               (lststr (vector-append v sv))
+               (vc (vector-copy lststr 3 4))
+               (u (vector 4 0))
+               (_ (vector-copy! u 1 (vector 4 2 0) 1 2))
+               (fv (vector 0 4 0))
+               (_ (vector-fill! fv 2 2 3))
+               (vl (vector-length (vector 0 1 2)))
+               (vm (vector-map (lambda (i) (+ 1 i)) (vector 3 1)))
+               (vr (vector-ref (vector 0 42 1) 1))
+               (vs (let ((v (vector 1 2)))
+                     (vector-set! v 0 4)
+                     v))
+               (v? (vector? #(1 2 3))))
+           (list v
+                 lst
+                 str
+                 lststr
+                 vc
+                 u
+                 fv
+                 vl
+                 vm
+                vr
+                vs
+                v?))
+         equal?
+         (list #(42 4 2)
+               '(42 4 2)
+               "42"
+               #(42 4 2 #\4 #\2)
+               #(#\4)
+               #(4 2)
+               #(0 4 2)
+               3
+               #(4 2)
+               42
+                #(4 2)
+                #t))
+
+  (test> "when" (when #t 42) = 42)
+
+  (test> "with-execption-handler" (with-exception-handler
+                                  (lambda (e) (write e) 5)
+                                  (lambda () (+ 1 (* 2 3) 35)))
+        = 42)
+
+  (test> "zero?" (list (zero? 0) (zero? 42)) equal? '(#t #f))
+
+
+  )
+
+;; (##inline-host-statement "console.log(@1@)" (error "here"))
+;; (##inline-host-statement "alert('r7rs')")
+(test-r7rs)
+#+end_src
+
+
+* ~gxjs-minlib.scm~ and ~gxjs-exec.scm~
+
+The idea here is the minimal amount of compiled output *JavaScript* while still
+having the ability to lazy load _everything_.
+
+We'll divide it into 3 phases and ~EVAL-WHEN~ :).
+
+ 1) Compile
+ 2) Load
+ 3) Execute
+
+Right now we have so little execute that, though it's called that, it's really
+load time. This is likely to change now that I know a little more about what I
+need.
+
+    #+begin_src javascript
+g_module_registry_init([new G_ModLinkInfo("gxjs-execute",0),new G_ModLinkInfo("gxjs-minlib",1)]);
+    #+end_src
+
+** Compile
+
+In the end the compile-time runtime library comes together in [[#minLib][~gxjs-minlib~]].
+
+*** ~min/host2scm2host.scm~
+
+~G_Foreign~ needs to be in ~g_scm2host~ and ~g_host2scm~
+
+As of this moment the upstream is not patched. In other (code) words :
+
+#+begin_src javascript
+bar = g_host2foreign(window);
+baz = g_scm2host(bar);
+// Uncaught scm2host error
+#+end_src
+
+Also, ~g_host2scm~ goes through the object and attempts to make an ~alist~ out
+of it. Unfortunatly, since a lot of objects recursively contain themselves, this
+fails a lot as well.
+
+Don't try this without the fixes. I've gotten "Paused before potenial out of
+memory crash" at the ~js~ *REPL* and stack blows for different attempts.
+
+#+begin_src javascript
+bat = g_host2scm(window);
+#+end_src
+
+The basic idea is to make any ~{ javascript: object }~ become a ~foreign?~
+object in ~g_host2scm~.
+
+In ~g_scm2host~ I've changed it so that a ~cons~ cell that is not a proper list
+is kept as a ~G_Pair~. *JavaScript* now has ~car~ and ~cdr~! ~g_host2scm~ just keeps it as is.
+
+#+begin_src javascript
+foo = new G_Pair(4, 2);
+// => G_Pair {car: 4, cdr: 2}
+g_scm2host(foo);
+// => G_Pair {car: 4, cdr: 2}
+g_host2scm(foo);
+// => G_Pair {car: 4, cdr: 2}
+#+end_src
+
+We'll still turn lists into array-like ~js~ objects and alists into ~objects
+.with.properties~.
+
+
+but nothing /vice versa/.
+
+The host has no idea about ~cons~ cells, AKA ~G_Pair~'s so will not, at this
+point, ever give us one.
+
+#+begin_src javascript :noweb-ref g_scm2host
+g_scm2host = function (obj) {
+  if (obj === void 0) {
+    return obj;
+  }
+  if (obj === null) {
+    return obj;
+  }
+  if (typeof obj === "boolean") {
+    return obj;
+  }
+  if (typeof obj === "number") {
+    return obj;
+  }
+  // this is what we add
+  if (obj instanceof G_Foreign) {
+    return g_foreign2host(obj);
+  }
+  if (obj instanceof G_Flonum) {
+    return obj.val;
+  }
+  if (obj instanceof G_ScmString) {
+    return obj.toString();
+  }
+  if (obj instanceof Array) {
+    return obj.map( g_scm2host );
+  }
+  if (obj instanceof G_U8Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_U16Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_U32Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_S8Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_S16Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_S32Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_F32Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_F64Vector) {
+    return obj.elems;
+  }
+  if (obj instanceof G_Pair) {
+    // If this is not a list, just return the pair as-is
+    if (!(obj.cdr instanceof G_Pair) && obj.cdr !== null) {
+      //console.log('this is a pair. not a list', obj)
+      return obj;
+    }
+    var jsobj = {};
+    var i = 0;
+    while (obj instanceof G_Pair) {
+      var elem = obj.car;
+      if (elem instanceof G_Pair) {
+        jsobj[g_scm2host(elem.car)] = g_scm2host(elem.cdr);
+      } else {
+        jsobj[i] = g_scm2host(elem);
+      }
+      ++i;
+      obj = obj.cdr;
+    }
+    return jsobj;
+  }
+  if (obj instanceof G_Structure) {
+    throw "scm2host error (cannot convert Structure)";
+  }
+  if (typeof obj === "function") {
+    return g_procedure2host(obj);
+  }
+  throw "scm2host error";
+};
+
+
+g_host2scm = function (obj) {
+  if (obj === void 0) {
+    return void 0;
+  }
+  if (obj === null) {
+    return null;
+  }
+  if (typeof obj === "boolean") {
+    return obj;
+  }
+  if (typeof obj === "number") {
+    if ((obj | 0) === obj && obj >= -536870912 && obj <= 536870911) {
+      return obj;
+    } else {
+      return new G_Flonum(obj);
+    }
+  }
+  if (typeof obj === "function") {
+    return g_host_function2scm(obj);
+  }
+  if (typeof obj === "string") {
+    return new G_ScmString(g_str2codes(obj));
+  }
+  if (obj instanceof G_Pair) { return obj ;}
+  if (obj instanceof Array) {
+    return obj.map( g_host2scm );
+  }
+  if (obj instanceof Uint8Array) {
+    return new G_U8Vector(obj);
+  }
+  if (obj instanceof Uint16Array) {
+    return new G_U16Vector(obj);
+  }
+  if (obj instanceof Uint32Array) {
+    return new G_U32Vector(obj);
+  }
+  if (obj instanceof Int8Array) {
+    return new G_S8Vector(obj);
+  }
+  if (obj instanceof Int16Array) {
+    return new G_S16Vector(obj);
+  }
+  if (obj instanceof Int32Array) {
+    return new G_S32Vector(obj);
+  }
+  if (obj instanceof Float32Array) {
+    return new G_F32Vector(obj);
+  }
+  if (obj instanceof Float64Array) {
+    return new G_F64Vector(obj);
+  }
+  // Here's the GX difference!
+  if (typeof obj === "object") {
+    // var alist = null;
+    // for (var key in obj) {
+    // alist = new G_Pair(new G_Pair(g_host2scm(key),g_host2scm(obj[key])),alist);
+    // }
+    // return alist;
+    return g_host2foreign(obj);
+  }
+  throw "host2scm error";
+};
+
+
+#+end_src
+
+Now it works.
+
+#+begin_src javascript
+bar = g_host2foreign(window);
+baz = g_scm2host(bar);
+//  Window {parent: Window, opener: null, top: Window, length: 0, frames: Window, …}
+#+end_src
+
+#+begin_src scheme :noweb yes :tangle "../gambit/min/host2scm2host.scm" :exports none
+
+(##inline-host-declaration #<<EOF
+
+{%g_scm2host%}
+
+EOF
+)
+#+end_src
+
+
+*** ~min/structure.scm~
+:PROPERTIES:
+:CUSTOM_ID: minStruct
+:END:
+
+Taken from ~_kernel.scm~.
+
+#+begin_src scheme :tangle ../gambit/min/structure.scm
+;;;----------------------------------------------------------------------------
+
+;;; Structure support.
+
+;; For bootstraping purposes the type of type objects must be
+;; explicitly constructed.  It is as though the following form had
+;; been used:
+;;
+;;   (define-type type
+;;     id: ...special-type...
+;;     (id      unprintable: equality-test:)
+;;     (name    unprintable: equality-skip:)
+;;     (flags   unprintable: equality-skip:)
+;;     (super   unprintable: equality-skip:)
+;;     (fields  unprintable: equality-skip:)
+;;   )
+
+(##define-macro (macro-type-type-constant)
+  (let ((type-type
+         (##structure
+          #f ;; this structure's type descriptor is itself! (set later)
+          '##type-5
+          'type
+          '8
+          '#f
+          '#(id 1 #f name 5 #f flags 5 #f super 5 #f fields 5 #f))))
+    (##structure-type-set! type-type type-type) ;; self reference
+    `',type-type))
+
+(define ##type-type (macro-type-type-constant))
+
+(define-prim (##type-id type)
+  (##unchecked-structure-ref type 1 ##type-type ##type-id))
+
+(define-prim (##type-name type)
+  (##unchecked-structure-ref type 2 ##type-type ##type-name))
+
+(define-prim (##type-flags type)
+  (##unchecked-structure-ref type 3 ##type-type ##type-flags))
+
+(define-prim (##type-super type)
+  (##unchecked-structure-ref type 4 ##type-type ##type-super))
+
+(define-prim (##type-fields type)
+  (##unchecked-structure-ref type 5 ##type-type ##type-fields))
+
+(define-prim (##structure-direct-instance-of? obj type-id)
+  (and (##structure? obj)
+       (##eq? (##type-id (##structure-type obj))
+              type-id)))
+
+(define-prim (##structure-instance-of? obj type-id)
+  (and (##structure? obj)
+       (let loop ((c (##structure-type obj)))
+         (if (##eq? (##type-id c) type-id)
+           #t
+           (let ((super (##type-super c)))
+             (and super
+                  (loop super)))))))
+
+(define-prim (##type? obj)
+  (##structure-direct-instance-of? obj (##type-id ##type-type)))
+
+(define-prim (##structure-type obj)
+  (##vector-ref obj 0))
+
+(define-prim (##structure-type-set! obj type)
+  (##vector-set! obj 0 type))
+
+(define-prim (##make-structure type len)
+  (let ((s (##make-vector len)))
+    (##subtype-set! s (macro-subtype-structure))
+    (##vector-set! s 0 type)
+    s))
+
+(define-prim (##structure-length obj)
+  (##vector-length obj))
+
+(define-prim (##structure type . fields)
+
+  (define (make-struct fields i)
+    (if (##pair? fields)
+        (let ((s (make-struct (##cdr fields) (##fx+ i 1))))
+          (##unchecked-structure-set! s (##car fields) i type #f)
+          s)
+        (##make-structure type i)))
+
+  (make-struct fields 1))
+
+(define-prim (##structure-ref obj i type proc)
+  (if (##structure-instance-of? obj (##type-id type))
+    (##unchecked-structure-ref obj i type proc)
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##structure-ref)
+     (if proc (##list obj) (##list obj i type proc)))))
+
+(define-prim (##structure-set! obj val i type proc)
+  (if (##structure-instance-of? obj (##type-id type))
+    (begin
+      (##unchecked-structure-set! obj val i type proc)
+      (##void))
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##structure-set!)
+     (if proc (##list obj val) (##list obj val i type proc)))))
+
+(define-prim (##structure-set obj val i type proc)
+  (if (##structure-instance-of? obj (##type-id type))
+    (let ((result (##structure-copy obj)))
+      (##unchecked-structure-set! result val i type proc)
+      result)
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##structure-set)
+     (if proc (##list obj val) (##list obj val i type proc)))))
+
+(define-prim (##structure-cas! obj val oldval i type proc)
+  (if (##structure-instance-of? obj (##type-id type))
+    (begin
+      (##unchecked-structure-cas! obj val oldval i type proc)
+      (##void))
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##structure-cas!)
+     (if proc (##list obj val oldval) (##list obj val oldval i type proc)))))
+
+(define-prim (##direct-structure-ref obj i type proc)
+  (if (##structure-direct-instance-of? obj (##type-id type))
+    (##unchecked-structure-ref obj i type proc)
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##direct-structure-ref)
+     (if proc (##list obj) (##list obj i type proc)))))
+
+(define-prim (##direct-structure-set! obj val i type proc)
+  (if (##structure-direct-instance-of? obj (##type-id type))
+    (begin
+      (##unchecked-structure-set! obj val i type proc)
+      (##void))
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##direct-structure-set!)
+     (if proc (##list obj val) (##list obj val i type proc)))))
+
+(define-prim (##direct-structure-set obj val i type proc)
+  (if (##structure-direct-instance-of? obj (##type-id type))
+    (let ((result (##structure-copy obj)))
+      (##unchecked-structure-set! result val i type proc)
+      result)
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##direct-structure-set)
+     (if proc (##list obj val) (##list obj val i type proc)))))
+
+(define-prim (##direct-structure-cas! obj val oldval i type proc)
+  (if (##structure-direct-instance-of? obj (##type-id type))
+    (begin
+      (##unchecked-structure-cas! obj val oldval i type proc)
+      (##void))
+    (##raise-type-exception
+     1
+     type
+     (if proc proc ##direct-structure-cas!)
+     (if proc (##list obj val oldval) (##list obj val oldval i type proc)))))
+
+(define-prim (##unchecked-structure-ref obj i type proc))
+
+(define-prim (##unchecked-structure-set! obj val i type proc))
+
+(define-prim (##unchecked-structure-cas! obj val oldval i type proc)
+  ;; TODO: remove after bootstrap
+  (##vector-cas! obj i val oldval))
+
+(define-prim (##structure-copy obj)
+  (let* ((len (##structure-length obj))
+         (type (##structure-type obj))
+         (result (##make-structure type len)))
+    (let loop ((i (##fx- len 1)))
+      (if (##fx> i 0)
+          (begin
+            (##unchecked-structure-set!
+             result
+             (##unchecked-structure-ref obj i type ##structure-copy)
+             i
+             type
+             ##structure-copy)
+            (loop (##fx- i 1)))
+          result))))
+
+;;;----------------------------------------------------------------------------
+
+#+end_src
+*** ~min/error.scm~
+
+#+begin_src scheme :tangle ../gambit/min/error.scm
+;;; File: "_nonstd.scm"
+;;;============================================================================
+
+;;; Implementation of exceptions.
+
+(implement-library-type-error-exception)
+
+(define-prim (##raise-error-exception message parameters)
+  (macro-raise
+   (macro-make-error-exception
+    message
+    parameters)))
+
+(implement-library-type-unbound-os-environment-variable-exception)
+
+(define-prim (##raise-unbound-os-environment-variable-exception proc . args)
+  (##extract-procedure-and-arguments
+   proc
+   args
+   #f
+   #f
+   #f
+   (lambda (procedure arguments dummy1 dummy2 dummy3)
+     (macro-raise
+      (macro-make-unbound-os-environment-variable-exception
+       procedure
+       arguments)))))
+
+;;;----------------------------------------------------------------------------
+
+;;; Define type checking procedures.
+
+(define-fail-check-type string-or-nonnegative-fixnum
+  'string-or-nonnegative-fixnum)
+
+(define-fail-check-type will
+  'will)
+
+(define-fail-check-type box
+  'box)
+
+;;;----------------------------------------------------------------------------
+
+;;; Non-standard procedures and special forms
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;; (define-prim (##deconstruct-call src size proc)
+;;   (let* ((code (##source-strip src))
+;;          (n (##proper-length code)))
+;;     (if (or (##not n)
+;;             (if (##fx< 0 size)
+;;                 (##not (##fx= n size))
+;;                 (##fx< n (##fx- 0 size))))
+;;         (##raise-ill-formed-special-form src)
+;;         (##apply proc (##cdr code)))))
+
+;; (define-prim (##expand-source-template src template)
+;;   (let ((locat (##source-locat src)))
+
+;;     (define (expand template)
+;;       (cond ((##source? template)
+;;              template)
+;;             ((##pair? template)
+;;              (##make-source
+;;               (expand-list template)
+;;               locat))
+;;             ((##vector? template)
+;;              (##make-source
+;;               (##list->vector (expand-list (##vector->list template)))
+;;               locat))
+;;             (else
+;;              (##make-source
+;;               template
+;;               locat))))
+
+;;     (define (expand-list template)
+;;       (cond ((or (##source? template)
+;;                  (##null? template))
+;;              template)
+;;             ((##pair? template)
+;;              (##cons (expand (##car template))
+;;                      (expand-list (##cdr template))))
+;;             (else
+;;              (##make-source
+;;               template
+;;               locat))))
+
+;;     (expand template)))
+
+;; ;;; - - - - - - - - - - - - - -
+- - - - - - - - - - - - - - - - - - - - - - - -
+
+(define-prim (##error message . parameters)
+  (##raise-error-exception message parameters))
+
+(define-prim (error message . parameters)
+  (##raise-error-exception message parameters))
+
+(define-prim (error-object? obj)
+  (macro-error-exception? obj))
+
+(define-prim (error-object-message err-obj)
+  (macro-check-error-exception
+    err-obj
+    1
+    (error-object-message err-obj)
+    (macro-error-exception-message err-obj)))
+
+(define-prim (error-object-irritants err-obj)
+  (macro-check-error-exception
+    err-obj
+    1
+    (error-object-irritants err-obj)
+    (macro-error-exception-parameters err-obj)))
+
+;; (define-runtime-syntax ##syntax-error
+;;   (lambda (src)
+;;     (##deconstruct-call
+;;      src
+;;      -2
+;;      (lambda (message . args)
+;;        (let ((m (##desourcify message)))
+;;          (if (##string? m)
+;;              (##apply ##raise-expression-parsing-exception
+;;                       (##cons m (##cons src (##map ##desourcify args))))
+;;              (##raise-ill-formed-special-form src)))))))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+#+end_src
+
+*** ~min/vector.scm~
+:PROPERTIES:
+:CUSTOM_ID: minVector
+:END:
+
+#+begin_src scheme :tangle ../gambit/min/vector.scm
+(define-prim-vector-procedures
+  vector
+  0
+  macro-no-force
+  macro-no-check
+  macro-no-check
+  #f
+  #f
+  define-map-and-for-each
+  ##equal?)
+(define-prim-vector-procedures
+  u8vector
+  0
+  macro-force-vars
+  macro-check-exact-unsigned-int8
+  macro-check-exact-unsigned-int8-list
+  macro-test-exact-unsigned-int8
+  ##fail-check-exact-unsigned-int8
+  #f
+  ##fx=)
+
+(define bytevector?        u8vector?)
+(define make-bytevector    make-u8vector)
+(define bytevector         u8vector)
+(define bytevector-length  u8vector-length)
+(define bytevector-u8-ref  u8vector-ref)
+(define bytevector-u8-set! u8vector-set!)
+(define bytevector-copy    u8vector-copy)
+(define bytevector-copy!   u8vector-copy!)
+(define bytevector-append  u8vector-append)
+
+;; (##include "~~/lib/gambit/vector/vector.scm")
+#+end_src
+
+*** COMMENT ~min/kernel.scm~
+
+A lot of things are in the "kernel" it seems. Here's what the browser says we
+need.
+#+begin_src scheme :tangle ../gambit/min/kernel.scm
+(##include "~~/lib/gambit/list/list.scm")
+#+end_src
+*** ~min/cte.scm~
+
+Compile time env for define-values.
+
+#+begin_src scheme :tangle ../gambit/min/cte.scm
+;;;----------------------------------------------------------------------------
+
+;;; Compile time environments
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; Representation of local variables (up and over) and global variables.
+
+(##define-macro (mk-loc-access src var up over) `(##vector ,var ,up ,over))
+(##define-macro (loc-access? x) `(##vector? ,x))
+(##define-macro (loc-access-var x) `(##vector-ref ,x 0))
+(##define-macro (loc-access-up x) `(##vector-ref ,x 1))
+(##define-macro (loc-access-over x) `(##vector-ref ,x 2))
+
+(##define-macro (mk-glo-access src id)
+  `(##make-global-var ,id))
+
+(##define-macro (glo-access? x)
+  `(##not (##vector? ,x)))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; Representation of compile time environments
+
+;; There are 4 types of structures in a compile time environment:
+;;
+;;    top        end of the environment and container for current state
+;;    frame      binding context for variables
+;;    macro      binding context for a macro
+;;    namespace  binding context for a namespace
+
+(define (##cte-top top-cte)
+  (##vector top-cte))
+
+(define (##cte-top? cte)
+  (##fx= (##vector-length cte) 1))
+
+(define (##cte-top-cte cte)
+  (##vector-ref cte 0))
+
+(define (##cte-top-cte-set! cte new-cte)
+  (##vector-set! cte 0 new-cte))
+
+(define (##cte-parent-cte cte)
+  (##vector-ref cte 0))
+
+(define (##cte-parent-cte-set! cte new-cte)
+  (##vector-set! cte 0 new-cte))
+
+(define (##cte-frame parent-cte vars)
+  (##vector parent-cte vars))
+
+(define (##cte-frame? cte)
+  (##fx= (##vector-length cte) 2))
+
+(define (##cte-frame-vars cte)
+  (##vector-ref cte 1))
+
+(define (##cte-frame-i parent-cte vars)
+  (##cte-frame parent-cte
+               vars)) ;; equivalent to: (map ##var-i vars)
+
+(define (##var-i name)
+  name)
+
+(define (##var-i? x)
+  (##not (##pair? x)))
+
+(define (##var-i-name x)
+  x)
+
+(define (##var-c name boxed?)
+  (##cons name boxed?))
+
+(define (##var-c? x)
+  (##pair? x))
+
+(define (##var-c-name x)
+  (##car x))
+
+(define (##var-c-boxed? x)
+  (##cdr x))
+
+(define (##cte-macro parent-cte name descr)
+  (##vector parent-cte name descr))
+
+(define (##cte-macro? cte)
+  (and (##fx= (##vector-length cte) 3)
+       (##not (##string? (##vector-ref cte 1))))) ;; distinguish from namespace
+
+(define (##cte-macro-name cte)
+  (##vector-ref cte 1))
+
+(define (##cte-macro-descr cte)
+  (##vector-ref cte 2))
+
+(define (##cte-decl parent-cte name value)
+  (##vector parent-cte name value #f))
+
+(define (##cte-decl? cte)
+  (##fx= (##vector-length cte) 4))
+
+(define (##cte-decl-name cte)
+  (##vector-ref cte 1))
+
+(define (##cte-decl-value cte)
+  (##vector-ref cte 2))
+
+(define (##cte-namespace parent-cte prefix aliases)
+  (##vector parent-cte prefix aliases))
+
+(define (##cte-namespace? cte)
+  (and (##fx= (##vector-length cte) 3)
+       (##string? (##vector-ref cte 1)))) ;; distinguish from macro
+
+(define (##cte-namespace-prefix cte)
+  (##vector-ref cte 1))
+
+(define (##cte-namespace-aliases cte)
+  (##vector-ref cte 2))
+
+(define (##cte-relink cte new-parent-cte)
+  (if new-parent-cte
+      (cond ((##cte-frame? cte)
+             (##cte-frame new-parent-cte
+                          (##cte-frame-vars cte)))
+            ((##cte-macro? cte)
+             (##cte-macro new-parent-cte
+                          (##cte-macro-name cte)
+                          (##cte-macro-descr cte)))
+            ((##cte-decl? cte)
+             (##cte-decl new-parent-cte
+                         (##cte-decl-name cte)
+                         (##cte-decl-value cte)))
+            ((##cte-namespace? cte)
+             (##cte-namespace new-parent-cte
+                              (##cte-namespace-prefix cte)
+                              (##cte-namespace-aliases cte))))
+      #f))
+
+(define (##cte-add-macro parent-cte name descr)
+
+  (define (replace cte)
+    (cond ((##cte-top? cte)
+           (##cte-macro cte name descr))
+          ((and (##cte-macro? cte) (##eq? name (##cte-macro-name cte)))
+           (##cte-macro (##cte-parent-cte cte) name descr))
+          (else
+           (##cte-relink cte (replace (##cte-parent-cte cte))))))
+
+  (replace parent-cte))
+
+(define (##cte-add-namespace parent-cte prefix aliases)
+
+  (define (replace cte)
+    (cond ((##cte-top? cte)
+           #f)
+          ((##cte-namespace? cte)
+           (if (##pair? (##cte-namespace-aliases cte))
+               (replace (##cte-parent-cte cte))
+               (##cte-namespace (##cte-parent-cte cte) prefix aliases)))
+          (else
+           #f))) ;; don't go beyond a frame, macro definition or declaration
+
+  (if (##pair? aliases)
+      (##cte-namespace parent-cte prefix aliases)
+      (or (replace parent-cte)
+          (##cte-namespace parent-cte prefix aliases))))
+
+(define (##check-namespace src)
+  (let ((code (##source-code src)))
+    (let loop1 ((forms (##cdr code)))
+      (cond ((##pair? forms)
+             (let* ((form-src (##sourcify (##car forms) src))
+                    (form (##source-code form-src)))
+               (if (##not (##pair? form))
+                   (##raise-expression-parsing-exception
+                    'ill-formed-namespace
+                    form-src)
+                   (let* ((space-src (##sourcify (##car form) form-src))
+                          (space (##source-code space-src)))
+                     (if (##not (##string? space))
+                         (##raise-expression-parsing-exception
+                          'namespace-prefix-must-be-string
+                          space-src)
+                         (if (##not (##namespace-valid? space))
+                             (##raise-expression-parsing-exception
+                              'ill-formed-namespace-prefix
+                              space-src)
+                             (let loop2 ((lst (##cdr form)))
+                               (cond ((##pair? lst)
+                                      (let* ((alias-src
+                                              (##sourcify (##car lst) form-src))
+                                             (alias
+                                              (##source-code alias-src)))
+                                        (if (##not (or (##symbol? alias)
+                                                       (and (##pair? alias)
+                                                            (##pair? (##cdr alias))
+                                                            (##null? (##cddr alias))
+                                                            (##symbol?
+                                                             (##source-code
+                                                              (##sourcify (##car alias) form-src)))
+                                                            (##symbol?
+                                                             (##source-code
+                                                              (##sourcify (##cadr alias) form-src))))))
+
+                                            (##raise-expression-parsing-exception
+
+                                             'ill-formed-namespace
+                                             form-src))
+                                        (loop2 (##cdr lst))))
+                                     ((##not (##null? lst))
+                                      (##raise-expression-parsing-exception
+                                       'ill-formed-namespace
+                                       form-src))
+                                     (else
+                                      (loop1 (##cdr forms)))))))))))
+            ((##not (##null? forms))
+             (##raise-expression-parsing-exception
+              'ill-formed-namespace
+              src))))))
+
+(define (##cte-process-declare parent-cte src)
+  (let ((decls (##cdr (##desourcify src))))
+    (let loop ((cte parent-cte) (decls decls))
+      (if (##pair? decls)
+          (let ((decl (##car decls)))
+            (if (##pair? decl)
+                (let ((d (##car decl)))
+                  (cond ((and (##eq? d 'proper-tail-calls)
+                              (##null? (##cdr decl)))
+                         (loop (##cte-decl cte 'proper-tail-calls #t)
+                               (##cdr decls)))
+                        ((and (##eq? d 'not)
+                              (##pair? (##cdr decl))
+                              (##eq? (##cadr decl) 'proper-tail-calls)
+                              (##null? (##cddr decl)))
+                         (loop (##cte-decl cte 'proper-tail-calls #f)
+                               (##cdr decls)))
+                        (else
+                         (loop cte
+                               (##cdr decls)))))
+                (loop cte
+                      (##cdr decls))))
+          cte))))
+
+(define (##cte-process-namespace parent-cte src)
+  (##check-namespace src)
+  (let ((forms (##cdr (##desourcify src))))
+    (let loop ((cte parent-cte) (forms forms))
+      (if (##pair? forms)
+          (let ((form (##car forms)))
+            (loop (##cte-add-namespace
+                   cte
+                   (##car form)
+                   (##map (lambda (x)
+                            (if (##symbol? x)
+                                (##cons x x)
+                                (##cons (##car x) (##cadr x))))
+                          (##cdr form)))
+                  (##cdr forms)))
+          cte))))
+
+(define (##cte-get-top-cte cte)
+  (if (##cte-top? cte)
+      cte
+      (##cte-get-top-cte (##cte-parent-cte cte))))
+
+(define (##cte-mutate-top-cte! cte proc)
+  (let ((top-cte (##cte-get-top-cte cte)))
+    (##cte-top-cte-set! top-cte (proc (##cte-top-cte top-cte)))))
+
+(define (##make-top-cte)
+  (let ((top-cte (##cte-top #f)))
+    (##cte-top-cte-set! top-cte top-cte)
+    top-cte))
+
+(define (##top-cte-add-macro! top-cte name def)
+  (let* ((cte (##cte-top-cte top-cte))
+         (global-name (##cte-global-macro-name cte name)))
+    (##cte-mutate-top-cte!
+     top-cte
+     (lambda (cte) (##cte-add-macro cte global-name def)))))
+
+(define (##top-cte-add-macro-no-dups! top-cte name def)
+
+  ;; this could be implemented as (##top-cte-add-macro! top-cte name def)
+  ;; but we know that top-cte has no duplicates so just add the macro
+  ;; at the tail with a mutation thus avoiding the allocation that
+  ;; would be caused by a relinking
+
+  (let* ((cte (##cte-top-cte top-cte))
+         (global-name (##cte-global-macro-name cte name)))
+    (let loop ((prev-cte top-cte) (cte cte))
+      (if (##cte-top? cte)
+          (##cte-parent-cte-set! prev-cte (##cte-macro cte global-name def))
+          (loop cte (##cte-parent-cte cte))))))
+
+(define (##top-cte-process-declare! top-cte src)
+  (##cte-mutate-top-cte!
+   top-cte
+   (lambda (cte) (##cte-process-declare cte src))))
+
+(define (##top-cte-process-namespace! top-cte src)
+  (##cte-mutate-top-cte!
+   top-cte
+   (lambda (cte) (##cte-process-namespace cte src))))
+
+(define (##top-cte-clone top-cte)
+  (let ((new-top-cte (##cte-top #f)))
+
+    (define (clone cte)
+      (if (##cte-top? cte)
+          new-top-cte
+          (##cte-relink cte (clone (##cte-parent-cte cte)))))
+
+    (##cte-top-cte-set! new-top-cte (clone (##cte-top-cte top-cte)))
+    new-top-cte))
+
+(define (##cte-lookup cte name)
+  (##declare (inlining-limit 500)) ;; inline CTE access procedures
+  (let loop1 ((name name) (full? (##full-name? name)) (cte cte) (up 0))
+    (if (##cte-top? cte)
+        (##vector 'not-found name)
+        (let ((parent-cte (##cte-parent-cte cte)))
+          (cond ((##cte-frame? cte)
+                 (let loop2 ((vars (##cte-frame-vars cte))
+                             (over 1))
+                   (if (##pair? vars)
+                       (let* ((var (##car vars))
+                              (vn (if (##var-i? var)
+                                      (##var-i-name var)
+                                      (##var-c-name var))))
+                         (if (and (##eq? name vn)
+                                  (##eq? full? (##full-name? vn)))
+                             (##vector 'var var up over)
+                             (loop2 (##cdr vars)
+                                    (##fx+ over 1))))
+                       (loop1 name full? parent-cte (##fx+ up 1)))))
+                ((##cte-macro? cte)
+                 (if (##eq? name (##cte-macro-name cte))
+                     (##vector 'macro name (##cte-macro-descr cte))
+                     (loop1 name full? parent-cte up)))
+                ((and (##not full?) (##cte-namespace? cte))
+                 (let ((full-name (##cte-namespace-lookup cte name)))
+                   (if full-name
+                       (loop1 full-name #t parent-cte up)
+                       (loop1 name #f parent-cte up))))
+                (else
+                 (loop1 name full? parent-cte up)))))))
+
+(define (##cte-global-macro-name cte name)
+  (if (##full-name? name)
+      name
+      (let loop ((cte cte))
+        (if (##cte-top? cte)
+            name
+            (let ((parent-cte (##cte-parent-cte cte)))
+              (cond ((##cte-namespace? cte)
+                     (let ((full-name (##cte-namespace-lookup cte name)))
+                       (or full-name
+                           (loop parent-cte))))
+                    (else
+                     (loop parent-cte))))))))
+
+(define (##cte-namespace-lookup cte name)
+  (let ((aliases (##cte-namespace-aliases cte)))
+    (if (##null? aliases)
+        (##make-full-name (##cte-namespace-prefix cte) name)
+        (let ((a (##assq name aliases)))
+          (if a
+              (##make-full-name (##cte-namespace-prefix cte) (##cdr a))
+              #f)))))
+
+(define ##namespace-separators '(#\#))
+
+(define-prim (##namespace-separators-set! x)
+  (set! ##namespace-separators x))
+
+(define (##namespace-separator-index str)
+  (let loop ((i (##fx- (##string-length str) 1)))
+    (if (##fx< i 0)
+        -1
+        (if (##memv (##string-ref str i) ##namespace-separators)
+            i
+            (loop (##fx- i 1))))))
+
+(define (##full-name? sym) ;; full name if it contains a namespace separator
+  (##fx>= (##namespace-separator-index (##symbol->string sym)) 0))
+
+(define (##namespace-split sym)
+  (let* ((str (##symbol->string sym))
+         (i (##fx+ 1 (##namespace-separator-index str))))
+    (##cons (##substring str 0 i)
+            (##string->symbol
+             (##substring str i (##string-length str))))))
+
+(define (##make-full-name prefix sym)
+  (if (##fx= (##string-length prefix) 0)
+      sym
+      (##string->symbol (##string-append prefix (##symbol->string sym)))))
+
+(define (##namespace-valid? str)
+
+  ;; non-null name followed by a namespace separator at end is
+  ;; valid as is the special prefix ""
+
+  (let ((len (##string-length str)))
+    (or (##fx= len 0)
+        (and (##not (##fx< len 2))
+             (##memq (##string-ref str (##fx- len 1))
+                     ##namespace-separators)))))
+
+(define (##var-lookup cte src)
+  (let* ((name (##source-code src))
+         (ind (##cte-lookup cte name)))
+    (case (##vector-ref ind 0)
+      ((not-found)
+       (let ((var (##vector-ref ind 1)))
+         (mk-glo-access src var)))
+      ((var)
+       (let ((var (##vector-ref ind 1))
+             (up (##vector-ref ind 2))
+             (over (##vector-ref ind 3)))
+         (mk-loc-access src var up over)))
+      (else
+       (##raise-expression-parsing-exception
+        'macro-used-as-variable
+        src
+        name)))))
+
+(define (##make-macro-descr def-syntax? size expander expander-src)
+  (##vector def-syntax? size expander expander-src))
+
+(define (##macro-descr-def-syntax? descr)
+  (##vector-ref descr 0))
+
+(define (##macro-descr-size descr)
+  (##vector-ref descr 1))
+
+(define (##macro-descr-expander descr)
+  (##vector-ref descr 2))
+
+(define (##macro-descr-expander-src descr)
+  (##vector-ref descr 3))
+
+(define-prim (##macro-lookup cte name)
+  (and (##symbol? name)
+       (let ((ind (##cte-lookup cte name)))
+         (case (##vector-ref ind 0)
+           ((not-found)
+            (##vector-ref ind 1))
+           ((macro)
+            (##vector-ref ind 2))
+           (else
+            name)))))
+
+(define-prim (##macro-lookup-set! x)
+  (set! ##macro-lookup x))
+
+(define-prim (##macro-expand cte src descr)
+  (##shape src src (##macro-descr-size descr))
+  (##sourcify
+   (if (##macro-descr-def-syntax? descr)
+       ((##macro-descr-expander descr) src)
+       (##apply (##macro-descr-expander descr)
+                (##cdr (##desourcify src))))
+   src))
+
+(define-prim (##macro-expand-set! x)
+  (set! ##macro-expand x))
+
+(define-prim (##macro-descr src def-syntax?)
+
+  (define (err)
+    (##raise-expression-parsing-exception
+     'ill-formed-macro-transformer
+     src))
+
+  (define (make-descr size)
+    (let ((expander (##eval-top src ##interaction-cte)))
+      (if (##not (##procedure? expander))
+          (err)
+          (##make-macro-descr def-syntax? size expander src))))
+
+  (if def-syntax?
+      (make-descr -1)
+      (let ((code (##source-code src)))
+        (if (and (##pair? code)
+                 (##memq (##source-code (##sourcify (##car code) src))
+                         '(##lambda lambda)))
+            (begin
+              (##shape src src -3)
+              (make-descr (##form-size (##sourcify (##cadr code) src))))
+            (err)))))
+
+(define-prim (##macro-descr-set! x)
+  (set! ##macro-descr x))
+
+(define (##form-size parms-src)
+  (let ((parms (##source-code parms-src)))
+    (let loop ((lst parms) (n 1))
+      (cond ((##pair? lst)
+             (let ((parm (##source-code (##sourcify (##car lst) parms-src))))
+               (if (##memq parm '(#!optional #!key #!rest))
+                   (##fx- 0 n)
+                   (loop (##cdr lst)
+                         (##fx+ n 1)))))
+            ((##null? lst)
+             n)
+            (else
+             (##fx- 0 n))))))
+
+(define (##cte-lookup-decl cte name default-value)
+  (##declare (inlining-limit 500)) ;; inline CTE access procedures
+  (let loop ((cte cte))
+    (if (##cte-top? cte)
+        default-value
+        (let ((parent-cte (##cte-parent-cte cte)))
+          (if (and (##cte-decl? cte)
+                   (##eq? name (##cte-decl-name cte)))
+              (##cte-decl-value cte)
+              (loop parent-cte))))))
+
+(define (##tail-call? cte tail?)
+  (and tail?
+       (##cte-lookup-decl cte 'proper-tail-calls #t)))
+
+;;;----------------------------------------------------------------------------
+
+#+end_src
+*** COMMENT ~min/eval.scm~
+
+~_eval.scm~ has a bunch. a lot. We only want a little bit.
+#+begin_src scheme :tangle ../gambit/min/eval.scm
+(##include "~~/lib/_eval#.scm")
+
+(define (##make-macro-descr def-syntax? size expander expander-src)
+  (##vector def-syntax? size expander expander-src))
+
+(define (##make-alias-syntax alias)
+  (lambda (src)
+    (let ((locat (##source-locat src)))
+      (##make-source
+       (##cons (##make-source alias locat)
+               (##cdr (##source-code src)))
+       locat))))
+
+;;;----------------------------------------------------------------------------
+
+;;; Interaction environment and syntactic aliases.
+
+(define ##interaction-cte
+  (let ((##interaction-cte (##make-top-cte)))
+
+    (define-runtime-syntax lambda
+      (##make-alias-syntax '##lambda))
+
+    (define-runtime-syntax quote
+      (##make-alias-syntax '##quote))
+
+    (define-runtime-syntax let
+      (##make-alias-syntax '##let))
+
+    (define-runtime-syntax define
+      (##make-alias-syntax '##define))
+
+    (define-runtime-syntax quasiquote
+      (##make-alias-syntax '##quasiquote))
+
+    (define-runtime-syntax set!
+      (##make-alias-syntax '##set!))
+
+    (define-runtime-syntax if
+      (##make-alias-syntax '##if))
+
+    (define-runtime-syntax cond
+      (##make-alias-syntax '##cond))
+
+    (define-runtime-syntax and
+      (##make-alias-syntax '##and))
+
+    (define-runtime-syntax or
+      (##make-alias-syntax '##or))
+
+    (define-runtime-syntax case
+      (##make-alias-syntax '##case))
+
+    (define-runtime-syntax let*
+      (##make-alias-syntax '##let*))
+
+    (define-runtime-syntax letrec
+      (##make-alias-syntax '##letrec))
+
+    (define-runtime-syntax letrec*
+      (##make-alias-syntax '##letrec*))
+
+    (define-runtime-syntax let-values
+      (##make-alias-syntax '##let-values))
+
+    (define-runtime-syntax let*-values
+      (##make-alias-syntax '##let*-values))
+
+    (define-runtime-syntax letrec-values
+      (##make-alias-syntax '##letrec-values))
+
+    (define-runtime-syntax letrec*-values
+      (##make-alias-syntax '##letrec*-values))
+
+    (define-runtime-syntax define-values
+      (##make-alias-syntax '##define-values))
+
+    (define-runtime-syntax do
+      (##make-alias-syntax '##do))
+
+    (define-runtime-syntax guard
+      (##make-alias-syntax '##guard))
+
+    (define-runtime-syntax r7rs-guard
+      (##make-alias-syntax '##r7rs-guard))
+
+    (define-runtime-syntax delay
+      (##make-alias-syntax '##delay))
+
+    (define-runtime-syntax delay-force
+      (##make-alias-syntax '##delay))
+
+    (define-runtime-syntax future
+      (##make-alias-syntax '##future))
+
+    (define-runtime-syntax c-define-type
+      (##make-alias-syntax '##c-define-type))
+
+    (define-runtime-syntax c-declare
+      (##make-alias-syntax '##c-declare))
+
+    (define-runtime-syntax c-initialize
+      (##make-alias-syntax '##c-initialize))
+
+    (define-runtime-syntax c-lambda
+      (##make-alias-syntax '##c-lambda))
+
+    (define-runtime-syntax c-define
+      (##make-alias-syntax '##c-define))
+
+    (define-runtime-syntax begin
+      (##make-alias-syntax '##begin))
+
+    (define-runtime-syntax define-macro
+      (##make-alias-syntax '##define-macro))
+
+    (define-runtime-syntax define-type
+      (##make-alias-syntax '##define-type))
+
+    (define-runtime-syntax define-type-of-thread
+      (##make-alias-syntax '##define-type-of-thread))
+
+    (define-runtime-syntax define-record-type
+      (##make-alias-syntax '##define-record-type))
+
+    (define-runtime-syntax define-structure
+      (##make-alias-syntax '##define-structure))
+
+    (define-runtime-syntax parameterize
+      (##make-alias-syntax '##parameterize))
+
+    (define-runtime-syntax receive
+      (##make-alias-syntax '##receive))
+
+    (define-runtime-syntax include
+      (##make-alias-syntax '##include))
+
+    (define-runtime-syntax include-ci
+      (##make-alias-syntax '##include-ci))
+
+    (define-runtime-syntax declare
+      (##make-alias-syntax '##declare))
+
+    (define-runtime-syntax namespace
+      (##make-alias-syntax '##namespace))
+
+    (define-runtime-syntax this-source-file
+      (##make-alias-syntax '##this-source-file))
+
+    (define-runtime-syntax cond-expand
+      (##make-alias-syntax '##cond-expand))
+
+    (define-runtime-syntax case-lambda
+      (##make-alias-syntax '##case-lambda))
+
+    (define-runtime-syntax when
+      (##make-alias-syntax '##when))
+
+    (define-runtime-syntax unless
+      (##make-alias-syntax '##unless))
+
+    (define-runtime-syntax syntax-error
+      (##make-alias-syntax '##syntax-error))
+
+    (define-runtime-syntax define-syntax
+      (##make-alias-syntax '##define-syntax))
+
+    (define-runtime-syntax syntax-rules
+      (lambda (src)
+        ((##eval '(##let ()
+                    (##demand-module _define-library/define-library-expand)
+                    syn#syntax-rules-form-transformer))
+         src)))
+
+    (define-runtime-syntax define-library
+      (lambda (src)
+        ((##eval '(##let ()
+                    (##demand-module _define-library/define-library-expand)
+                    _define-library/define-library-expand#define-library-expand))
+         src)))
+
+    (define-runtime-syntax import
+      (lambda (src)
+        ((##eval '(##let ()
+                    (##demand-module _define-library/define-library-expand)
+                    _define-library/define-library-expand#import-expand))
+         src)))
+
+    ##interaction-cte))
+
+;;;============================================================================
+
+#+end_src
+
+*** ~min/equality.scm~
+:PROPERTIES:
+:CUSTOM_ID: minEquality
+:END:
+
+#+begin_src scheme :tangle ../gambit/min/equality.scm
+;;;----------------------------------------------------------------------------
+
+;;; Object equality.
+
+;;; imports:
+;;; from _kernel.scm
+;;;    (##type-fields ...)
+;;;    (##type-flags ...)
+;;;    (##type-id ...)
+;;;    (##type-super ...)
+;;; from _num.scm
+;;;    (##exact-int.= ...)
+;;;    (##ratnum.= ...)
+;;; from _std.scm
+;;;    (##f32vector-equal? ...)
+;;;    (##f64vector-equal? ...)
+;;;    (##s16vector-equal? ...)
+;;;    (##s32vector-equal? ...)
+;;;    (##s64vector-equal? ...)
+;;;    (##s8vector-equal? ...)
+;;;    (##string-equal? ...)
+;;;    (##u16vector-equal? ...)
+;;;    (##u32vector-equal? ...)
+;;;    (##u64vector-equal? ...)
+;;;    (##u8vector-equal? ...)
+;;;    (##vector-equal? ...)
+
+;;; exports:
+;;;    (##case-memv ...)
+;;;    (##eq? ...)
+;;;    (##equal? ...)
+;;;    (##eqv? ...)
+;;;    (eq? ...)
+;;;    (equal? ...)
+;;;    (eqv? ...)
+
+;;;----------------------------------------------------------------------------
+
+;;; Support for the case special form.
+
+;;; The compiler frontend converts
+;;;
+;;;   (case x ((a b) c) ...)
+;;;
+;;; to
+;;;
+;;;   (if (##case-memv x '(a b)) c ...)
+
+(define-prim (##case-memv obj lst)
+  (macro-force-vars (obj)
+    (let loop ((x lst))
+      (if (##pair? x)
+          (if (let () (##declare (generic)) (##eqv? obj (##car x)))
+              x
+              (loop (##cdr x)))
+          #f))))
+
+;;;----------------------------------------------------------------------------
+
+(##define-macro (macro-numeqv?-otherwise obj1 obj2 true false otherwise)
+  `(macro-number-dispatch ,obj1 ,otherwise
+     (if (##fixnum? ,obj2) ;; obj1 = fixnum
+         (if (##fx= ,obj1 ,obj2)
+             ,true
+             ,false)
+         ,false)
+     (if (##bignum? ,obj2) ;; obj1 = bignum
+         (if (##exact-int.= ,obj1 ,obj2)
+             ,true
+             ,false)
+         ,false)
+     (if (##ratnum? ,obj2) ;; obj1 = ratnum
+         (if (##ratnum.= ,obj1 ,obj2)
+             ,true
+             ,false)
+         ,false)
+     (if (##flonum? ,obj2) ;; obj1 = flonum
+         (if (##fleqv? ,obj1 ,obj2)
+             ,true
+             ,false)
+         ,false)
+     (if (##cpxnum? ,obj2) ;; obj1 = cpxnum
+         (if (and (##eqv? (macro-cpxnum-real ,obj1) (macro-cpxnum-real ,obj2))
+                  (##eqv? (macro-cpxnum-imag ,obj1) (macro-cpxnum-imag ,obj2)))
+             ,true
+             ,false)
+         ,false)))
+
+(define-prim (##eqv? obj1 obj2)
+  (or (##eq? obj1 obj2)
+      (macro-numeqv?-otherwise
+       obj1
+       obj2
+       #t
+       #f
+       #f)))
+
+(define-prim (eqv? obj1 obj2)
+  (macro-force-vars (obj1 obj2)
+    (let ()
+      (##declare (generic)) ;; avoid fixnum specific ##eqv?
+      (##eqv? obj1 obj2))))
+
+(define-prim (##eq? obj1 obj2))
+
+(define-prim (eq? obj1 obj2)
+  (macro-force-vars (obj1 obj2)
+    (##eq? obj1 obj2)))
+
+(define-prim-nary-bool (##symbol=? x y)
+  #t
+  #t
+  (##eq? x y)
+  macro-no-force
+  macro-no-check)
+
+(define-prim-nary-bool (symbol=? x y)
+  #t
+  (if (##symbol? x) #t '(1))
+  (##eq? x y)
+  macro-force-vars
+  macro-check-symbol
+  (##pair? ##fail-check-symbol))
+
+(define-prim-nary-bool (##boolean=? x y)
+  #t
+  #t
+  (##eq? x y)
+  macro-no-force
+  macro-no-check)
+
+(define-prim-nary-bool (boolean=? x y)
+  #t
+  (if (##boolean? x) #t '(1))
+  (##eq? x y)
+  macro-force-vars
+  macro-check-boolean
+  (##pair? ##fail-check-boolean))
+
+;;-----------------------------------------------------------------------------
+
+(##define-macro (macro-define-equal-objs?
+                 equal-objs?
+                 params
+                 custom-recursion-handler
+                 .
+                 local-defines)
+
+  `(define (,equal-objs? obj1 obj2 ,@params)
+
+     ,@local-defines
+
+     ,@(if custom-recursion-handler
+           `()
+           `((define (table-equal obj1 obj2 ,@params)
+               (conj (gc-hash-table-equal (macro-table-gcht obj1)
+                                          obj2
+                                          ,@params)
+                     (if (macro-table-test obj1)
+                         (gc-hash-table-equal (macro-table-hash obj1)
+                                              obj2
+                                              ,@params)
+                         (true))))
+
+             (define (gc-hash-table-equal ht1 table2 ,@params)
+               (##declare (not interrupts-enabled))
+               (if (##gc-hash-table? ht1)
+                   (let loop ((i (macro-gc-hash-table-key0))
+                              ,@(map (lambda (p) `(,p ,p))
+                                     params))
+                     (if (##fx< i (##vector-length ht1))
+                         (let ((key1 (##vector-ref ht1 i)))
+                           (if (or (##eq? key1 (macro-unused-obj))
+                                   (##eq? key1 (macro-deleted-obj)))
+                               (let ()
+                                 (##declare (interrupts-enabled))
+                                 (loop (##fx+ i 2)
+                                       ,@params))
+                               (let* ((val1
+                                       (##vector-ref ht1 (##fx+ i 1)))
+                                      (val2
+                                       (##table-ref table2
+                                                    key1
+                                                    (macro-unused-obj))))
+                                 (conj (,equal-objs?
+                                        val1
+                                        val2
+                                        ,@params)
+                                       (let ()
+                                         (##declare (interrupts-enabled))
+                                         (loop (##fx+ i 2)
+                                               ,@params))))))
+                         (true)))))
+
+             (define (structure-equal obj1 obj2 type len ,@params)
+               (if (##not type) ;; have we reached root of inheritance chain?
+                   (true)
+                   (let ((fields (##type-fields type)))
+                     (let loop ((i*3 (##fx- (##vector-length fields) 3))
+                                (len len)
+                                ,@(map (lambda (p) `(,p ,p))
+                                       params))
+                       (if (##fx< i*3 0) ;; time to check inherited fields?
+                           (structure-equal obj1
+                                            obj2
+                                            (##type-super type)
+                                            len
+                                            ,@params)
+                           (let ((field-attributes
+                                  (##vector-ref fields (##fx+ i*3 1)))
+                                 (len-1
+                                  (##fx- len 1)))
+                             (if (##not (##fx= ;; equality-skip flag set?
+                                         (##fxand field-attributes 4)
+                                         0))
+                                 (loop (##fx- i*3 3) ;; don't check this field
+                                       len-1
+                                       ,@params)
+                                 (conj (,equal-objs? (##unchecked-structure-ref
+                                                      obj1
+                                                      len-1
+                                                      type
+                                                      #f)
+                                                     (##unchecked-structure-ref
+                                                      obj2
+                                                      len-1
+                                                      type
+                                                      #f)
+                                                     ,@params)
+                                       (loop (##fx- i*3 3)
+                                             len-1
+                                             ,@params)))))))))))
+
+     (macro-force-vars (obj1 obj2)
+       (if (##eq? obj1 obj2)
+           (begin
+             (profile! 0)
+             (true))
+           (cond ((##pair? obj1)
+                  (profile! 1)
+                  (if (##not (##pair? obj2))
+                      (false)
+                      ,(if custom-recursion-handler
+                           `(,custom-recursion-handler obj1 obj2 ,@params)
+                           `(recursion
+                             obj1
+                             obj2
+                             (conj (,equal-objs? (##car obj1)
+                                                 (##car obj2)
+                                                 ,@params)
+                                   (,equal-objs? (##cdr obj1)
+                                                 (##cdr obj2)
+                                                 ,@params))))))
+                 ((##vector? obj1)
+                  (profile! 2)
+                  (if (##not (##vector? obj2))
+                      (false)
+                      (let ((len (##vector-length obj1)))
+                        (if (##not (##fx= len (##vector-length obj2)))
+                            (false)
+                            ,(if custom-recursion-handler
+                                 `(,custom-recursion-handler obj1 obj2 ,@params)
+                                 `(recursion
+                                   obj1
+                                   obj2
+                                   (let loop ((i (##fx- len 1))
+                                              ,@(map (lambda (p) `(,p ,p))
+                                                     params))
+                                     (if (##fx< i 0)
+                                         (true)
+                                         (conj (,equal-objs?
+                                                (##vector-ref obj1 i)
+                                                (##vector-ref obj2 i)
+                                                ,@params)
+                                               (loop (##fx- i 1)
+                                                     ,@params))))))))))
+                 ((##fixnum? obj1)
+                  (profile! 3)
+                  (if (and (##fixnum? obj2)
+                           (##fx= obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##bignum? obj1)
+                  (profile! 4)
+                  (if (and (##bignum? obj2)
+                           (##exact-int.= obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##ratnum? obj1)
+                  (profile! 5)
+                  (if (and (##ratnum? obj2)
+                           (##ratnum.= obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##flonum? obj1)
+                  (profile! 6)
+                  (if (and (##flonum? obj2)
+                           (##fleqv? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##cpxnum? obj1)
+                  (profile! 7)
+                  (if (and (##cpxnum? obj2)
+                           (##eqv? (macro-cpxnum-real obj1)
+                                   (macro-cpxnum-real obj2))
+                           (##eqv? (macro-cpxnum-imag obj1)
+                                   (macro-cpxnum-imag obj2)))
+                      (true)
+                      (false)))
+                 ((macro-table? obj1)
+                  (profile! 8)
+                  (if (##not (and (macro-table? obj2)
+                                  (##fx= (macro-table-flags obj1)
+                                         (macro-table-flags obj2))
+                                  (##eq? (macro-table-test obj1)
+                                         (macro-table-test obj2))
+                                  (if (macro-table-test obj1)
+                                      (##eq? (macro-table-hash obj1)
+                                             (macro-table-hash obj2))
+                                      #t)
+                                  (##fx= (##table-length obj1)
+                                         (##table-length obj2))))
+                      (false)
+                      ,(if custom-recursion-handler
+                           `(,custom-recursion-handler
+                             obj1
+                             obj2
+                             ,@params)
+                           `(recursion
+                             obj1
+                             obj2
+                             (table-equal
+                              obj1
+                              obj2
+                              ,@params)))))
+                 ((##structure? obj1)
+                  (profile! 9)
+                  (if (##not (##structure? obj2))
+                      (false)
+                      (let ((type (##structure-type obj1)))
+                        (if (##not (##eq? (##type-id type)
+                                          (##type-id
+                                           (##structure-type obj2))))
+                            (false)
+                            (let ((len (##structure-length obj1)))
+                              (if (##not
+                                   (and (##fx=
+                                         len
+                                         (##structure-length obj2))
+                                        (##fx= ;; not opaque?
+                                         (##fxand
+                                          (##type-flags type)
+                                          1)
+                                         0)))
+                                  (false)
+                                  ,(if custom-recursion-handler
+                                       `(,custom-recursion-handler
+                                         obj1
+                                         obj2
+                                         ,@params)
+                                       `(recursion
+                                         obj1
+                                         obj2
+                                         (structure-equal
+                                          obj1
+                                          obj2
+                                          type
+                                          len
+                                          ,@params)))))))))
+                 ((##box? obj1)
+                  (profile! 10)
+                  (if (##not (##box? obj2))
+                      (false)
+                      ,(if custom-recursion-handler
+                           `(,custom-recursion-handler
+                             obj1
+                             obj2
+                             ,@params)
+                           `(recursion
+                             obj1
+                             obj2
+                             (,equal-objs?
+                              (##unbox obj1)
+                              (##unbox obj2)
+                              ,@params)))))
+                 ((##string? obj1)
+                  (profile! 11)
+                  (if (and (##string? obj2)
+                           (##string-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##u8vector? obj1)
+                  (profile! 12)
+                  (if (and (##u8vector? obj2)
+                           (##u8vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##s8vector? obj1)
+                  (profile! 13)
+                  (if (and (##s8vector? obj2)
+                           (##s8vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##u16vector? obj1)
+                  (profile! 14)
+                  (if (and (##u16vector? obj2)
+                           (##u16vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##s16vector? obj1)
+                  (profile! 15)
+                  (if (and (##s16vector? obj2)
+                           (##s16vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##u32vector? obj1)
+                  (profile! 16)
+                  (if (and (##u32vector? obj2)
+                           (##u32vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##s32vector? obj1)
+                  (profile! 17)
+                  (if (and (##s32vector? obj2)
+                           (##s32vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##u64vector? obj1)
+                  (profile! 18)
+                  (if (and (##u64vector? obj2)
+                           (##u64vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##s64vector? obj1)
+                  (profile! 19)
+                  (if (and (##s64vector? obj2)
+                           (##s64vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##f32vector? obj1)
+                  (profile! 20)
+                  (if (and (##f32vector? obj2)
+                           (##f32vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 ((##f64vector? obj1)
+                  (profile! 21)
+                  (if (and (##f64vector? obj2)
+                           (##f64vector-equal? obj1 obj2))
+                      (true)
+                      (false)))
+                 (else
+                  (profile! 22)
+                  (false)))))))
+
+(macro-case-target
+
+ ((C)
+
+(define ##equal-hint 0)
+
+(##define-macro (macro-equal-hint-get)
+  `##equal-hint)
+
+(##define-macro (macro-equal-hint-set! hint)
+  `(let ((h ,hint))
+     (set! ##equal-hint h)))
+
+(define-prim (##equal? obj1 obj2)
+
+  ;; various parameters to control how much effort is assigned to the fast
+  ;; and slow algorithms
+
+  (define fast-bank0    150)
+  (define slow-size0    40)
+  (define fast-bank1    2000)
+  (define limit-growth  4)
+  (define hint-bloat    135)
+  (define max-used-bank 100000)
+  (define max-ht-count  4000)
+  (define loads         '#f64(0.0 0.2 0.85))
+
+  (##define-macro (profile! i)
+    `#f) ;; disable profiling
+
+  ;; fast equality testing using a time bank to terminate when objects
+  ;; have sharing or cycles
+
+  (macro-define-equal-objs?
+   fast-equal-objs? (bank)
+   #f
+
+   (##define-macro (true) `bank)
+   (##define-macro (false) `##min-fixnum)
+
+   (##define-macro (recursion obj1 obj2 tail-expr)
+     `(let ((bank (##fx- bank 1)))
+        (if (##fx< bank 0)
+            bank
+            ,tail-expr)))
+
+   (##define-macro (conj equal-obj?-expr tail-expr)
+     `(let ((bank ,equal-obj?-expr))
+        (if (##fx< bank 0)
+            bank
+            ,tail-expr))))
+
+  ;; slow equality testing using a hash table to check for sharing and cycles
+
+  (macro-define-equal-objs?
+   slow-equal-objs? (ht)
+   #f
+
+   (##define-macro (true) `1)
+   (##define-macro (false) `0)
+
+   (##define-macro (recursion obj1 obj2 tail-expr)
+     `(let ((r (union-find ,obj1 ,obj2 ht)))
+        (if (##not (##fx= r (false)))
+            r ;; either obj1 & obj2 were in same equiv class or need to abort
+            ,tail-expr)))
+
+   (##define-macro (conj equal-obj?-expr tail-expr)
+     `(let ((r ,equal-obj?-expr))
+        (if (##not (##fx= r (true)))
+            r ;; either obj1 & obj2 are not equal or need to abort
+            ,tail-expr)))
+
+   ;; union-find algorithm to detect sharing and cycles
+
+   (define (union-find obj1 obj2 ht)
+     (let* ((uht (##unbox ht))
+            (code (##gc-hash-table-union! uht obj1 obj2)))
+
+       ;; code
+       ;; 0    obj1 and obj2 found in ht, and in same equiv class
+       ;; 1    obj1 and obj2 found in ht, but not in same equiv class
+       ;; 2-3  only one of obj1 and obj2 found in ht (2 = need to grow ht)
+       ;; 4-5  neither obj1 or obj2 found in ht (4 = need to grow ht)
+
+       (if (##fx< code 4) ;; code = 0, 1, 2 or 3... keep track of sharing
+           (macro-gc-hash-table-min-count-set!
+            uht
+            (##fx+ 1 (macro-gc-hash-table-min-count uht))))
+
+       (if (##fx= code 0)
+           (true)
+           (if (##fxodd? code) ;; code = 1, 3 or 5
+               (false)
+               ;; hash table is full and needs to be grown
+               (if (##fx= 0 (macro-gc-hash-table-min-count uht))
+                   -1 ;; no sharing found so abort equality testing
+                   (let ((new-ht ;; sharing found so keep going
+                          (##gc-hash-table-rehash!
+                           uht
+                           (##gc-hash-table-resize! uht loads))))
+                     (##set-box! ht new-ht)
+                     (false))))))))
+
+  ;; main equality testing function
+
+  (macro-define-equal-objs?
+   main-equal-objs? ()
+   recursion-handler
+
+   (##define-macro (true) `#t)
+   (##define-macro (false) `#f)
+
+   (define (recursion-handler obj1 obj2)
+     (let ((hint (macro-equal-hint-get)))
+       (cond ((##fx= hint 0)
+              (let* ((bank fast-bank0)
+                     (fr (fast-equal-objs? obj1 obj2 bank)))
+                (if (##fx>= fr 0) ;; determine if bank was not exhausted
+                    (fast-equal-returning-true (##fx- bank fr)) ;; equal
+                    (if (##fx= fr ##min-fixnum)
+                        (fast-equal-returning-false) ;; not equal
+                        (let* ((size slow-size0) ;; exhausted available bank
+                               (ht (new-gc-hash-table size))
+                               (sr (slow-equal-objs? obj1 obj2 ht)))
+                          (if (##fx= sr -1) ;; reached limit, so try fast algo
+                              (fast obj1 obj2 fast-bank1)
+                              (slow-equal-returning
+                               (##not (##fx= sr 0))
+                               (macro-gc-hash-table-count (##unbox ht)))))))))
+             ((##fx> hint 0)
+              (fast obj1 obj2 hint))
+             (else
+              (slow obj1 obj2 (##fx- hint))))))
+
+   (define (fast obj1 obj2 limit)
+     (let* ((bank (##fx* limit-growth limit))
+            (fr (fast-equal-objs? obj1 obj2 bank)))
+       (if (##fx>= fr 0) ;; determine if bank was not exhausted
+           (fast-equal-returning-true (##fx- bank fr)) ;; equal
+           (if (##fx= fr ##min-fixnum)
+               (fast-equal-returning-false) ;; not equal
+               (slow obj1 obj2 limit))))) ;; reached limit, so try slow algo
+
+   (define (fast-equal-returning-false)
+     ;; change hint only if currently "slow"
+     (if (##fx> (macro-equal-hint-get) 0)
+         (macro-equal-hint-set! 0))
+     #f)
+
+   (define (fast-equal-returning-true used-bank)
+     ;; change hint to "fast" with 135% of used bank
+     (let ((new-bank
+            (##fxquotient (##fx* (##fxmin used-bank max-used-bank) hint-bloat)
+                          100)))
+       (macro-equal-hint-set! (##fxmax new-bank fast-bank0))
+       #t))
+
+   (define (slow obj1 obj2 limit)
+     (let* ((size limit)
+            (ht (new-gc-hash-table size))
+            (sr (slow-equal-objs? obj1 obj2 ht)))
+        (if (##fx= sr -1) ;; reached limit, so try fast algorithm
+            (fast obj1 obj2 (##fx* limit-growth limit))
+            (slow-equal-returning
+             (##not (##fx= sr 0))
+             (macro-gc-hash-table-count (##unbox ht))))))
+
+   (define (slow-equal-returning result count)
+     ;; change hint to "slow" with 135% of count
+     (let ((new-count
+            (##fxquotient (##fx* (##fxmin count max-ht-count) hint-bloat)
+                          100)))
+       (macro-equal-hint-set! (##fx- (##fxmax new-count slow-size0)))
+       result))
+
+   (define (new-gc-hash-table size)
+     (let ((uht (##gc-hash-table-allocate
+                 size
+                 (##fxior (macro-gc-hash-table-flag-mem-alloc-keys)
+                          (macro-gc-hash-table-flag-union-find))
+                 loads)))
+       (macro-gc-hash-table-min-count-set! uht 0)
+       (##box uht))))
+
+  (main-equal-objs? obj1 obj2))
+
+)
+
+ (else
+
+(define-prim (##equal? obj1 obj2)
+
+  (##define-macro (profile! i)
+    `#f) ;; disable profiling
+
+  (macro-define-equal-objs?
+   equal-objs? ()
+   #f
+
+   (##define-macro (macro-table-hash obj) `#f)
+   (##define-macro (macro-table-gcht obj) `#f)
+
+   (##define-macro (true) `#t)
+   (##define-macro (false) `#f)
+
+   (##define-macro (recursion obj1 obj2 tail-expr)
+     tail-expr)
+
+   (##define-macro (conj equal-obj?-expr tail-expr)
+     `(and ,equal-obj?-expr ,tail-expr)))
+
+  (equal-objs? obj1 obj2))
+
+))
+
+(define-prim (equal? obj1 obj2)
+  (##equal? obj1 obj2))
+
+#+end_src
+
+
+*** ~min/system.scm~
+
+#+begin_src scheme :tangle ../gambit/min/system.scm
+#+end_src
+*** ~min/symkey.scm~
+:PROPERTIES:
+:CUSTOM_ID: minChar
+:END:
+
+*Gambit*, or at least my version as built, has a symbols and keywords module. I like them!.
+
+#+begin_src scheme :tangle ../gambit/min/symkey.scm
+(##include "~~/lib/gambit/symkey/symkey.scm")
+#+end_src
+*** ~min/string.scm~
+:PROPERTIES:
+:CUSTOM_ID: minChar
+:END:
+
+*Gambit*, or at least my version as built, has a string module. I like strings. But, it also takes a few MB's of code. I dislike that.
+
+#+begin_src scheme :tangle ../gambit/min/string.scm
+;; nope, don't do this.
+(##include "~~/lib/gambit/string/string.scm")
+#+end_src
+
+#+begin_src scheme :tangle ../gambit/min/g_string.scm
+
+(##include "~~/lib/gambit/string/string#.scm")
+;;;----------------------------------------------------------------------------
+
+(define-prim-vector-procedures
+  string
+  #\nul
+  macro-force-vars
+  macro-check-char
+  macro-check-char-list
+  macro-test-char
+  ##fail-check-char
+  define-map-and-for-each
+  ##char=?)
+
+;;;----------------------------------------------------------------------------
+
+(define-prim-nary-bool (##string=? str1 str2)
+  #t
+  #t
+  (##string-equal? str1 str2)
+  macro-no-force
+  macro-no-check)
+
+(define-prim-nary-bool (string=? str1 str2)
+  #t
+  #t
+  (##string-equal? str1 str2)
+  macro-force-vars
+  macro-check-string)
+
+
+(##define-macro (list->string . args) `(##list->string ,@args))
+;(##list->string '(1 2))
+#+end_src
+
+*** ~min/char.scm~
+:PROPERTIES:
+:CUSTOM_ID: minChar
+:END:
+
+*Gambit*, or at least my version as built, has a char module. I like chars.
+
+#+begin_src scheme :tangle ../gambit/min/char.scm
+(##include "~~/lib/gambit/char/char.scm")
+#+end_src
+*** ~min/list.scm~
+:PROPERTIES:
+:CUSTOM_ID: minList
+:END:
+
+*Gambit*, or at least my version as built, has a list module. I like lists.
+
+#+begin_src scheme :tangle ../gambit/min/list.scm
+(##include "~~/lib/gambit/list/list.scm")
+
+(define-prim (##append-reverse! lst tail)
+  (let loop ((prev tail) (curr lst))
+    (if (##pair? curr)
+        (let ((next (##cdr curr)))
+          (##set-cdr! curr prev)
+          (loop curr next))
+        prev)))
+
+#+end_src
+*** ~min/thread.scm~
+
+#+begin_src scheme :tangle ../gambit/min/thread.scm
+(##include "~~/lib/gambit/prim/thread#.scm")
+(##include "~~/lib/_thread#.scm")
+(##include "~~/lib/gambit/prim/thread-gambit#.scm")
+
+;;;----------------------------------------------------------------------------
+
+;;; Inlined thread primitives.
+
+(define-prim (##current-thread))
+(define-prim (##current-processor))
+(define-prim (##current-processor-id))
+(define-prim (##processor id))
+(define-prim (##current-vm))
+
+(define-prim (##primitive-lock! btq i j))
+(define-prim (##primitive-trylock! btq i j))
+(define-prim (##primitive-unlock! btq i j))
+
+(define-prim (##object-before? x y))
+;;;----------------------------------------------------------------------------
+
+;; The procedure current-processor returns the processor executing the
+;; current thread.
+
+(define-prim (current-processor)
+
+  (##declare (not interrupts-enabled))
+
+  (macro-current-processor))
+
+;;;----------------------------------------------------------------------------
+
+;; The procedure processor? returns #t when the parameter is a processor
+;; and #f otherwise.
+
+(define-prim (processor? obj)
+
+  (##declare (not interrupts-enabled))
+
+  (macro-force-vars (obj)
+    (macro-processor? obj)))
+
+;;;----------------------------------------------------------------------------
+
+;; The procedure processor? returns #t when the parameter is a processor
+;; and #f otherwise.
+
+(define-prim (processor-id processor)
+
+  (##declare (not interrupts-enabled))
+
+  (macro-force-vars (processor)
+    (macro-check-processor processor 1 (processor-id processor)
+      (macro-processor-id processor))))
+
+;;;----------------------------------------------------------------------------
+;;;----------------------------------------------------------------------------
+
+;; The procedure current-thread returns the thread currently executing
+;; on the current processor.
+
+(define-prim (current-thread)
+
+  (##declare (not interrupts-enabled))
+
+  (macro-current-thread))
+
+;;;----------------------------------------------------------------------------
+
+;; The procedure thread? returns #t when the parameter is a thread
+;; and #f otherwise.
+
+(define-prim (thread? obj)
+
+  (##declare (not interrupts-enabled))
+
+  (macro-force-vars (obj)
+    (macro-thread? obj)))
+
+;;;----------------------------------------------------------------------------
+(##define-macro (macro-parameter-descr param)
+  `(##closure-ref ,param 1))
+
+(define-prim (##make-tgroup name parent)
+  (##declare (not interrupts-enabled))
+  (macro-make-tgroup name parent))
+
+(define-prim (##env-lookup env param)
+  (##declare (not interrupts-enabled))
+  (let ((hash-param
+         (macro-parameter-descr-hash
+          (macro-parameter-descr param))))
+
+    (define (lookup env)
+      (if (##null? env)
+        #f
+        (let* ((x
+                (macro-env-param-val env))
+               (param-x
+                (##car x))
+               (hash-param-x
+                (macro-parameter-descr-hash
+                 (macro-parameter-descr param-x))))
+          (cond ((##fx< hash-param hash-param-x)
+                 (lookup (macro-env-left env)))
+                ((or (##fx< hash-param-x hash-param)
+                     (##not (##eq? param-x param)))
+                 (lookup (macro-env-right env)))
+                (else
+                 x)))))
+
+    (lookup env)))
+
+;;;----------------------------------------------------------------------------
+
+(define-prim (##dynamic-env-bind denv thunk)
+  (##declare (not interrupts-enabled))
+  (let* ((current-thread
+          (macro-current-thread))
+         (old-denv
+          (macro-thread-denv current-thread)))
+    (macro-thread-denv-set! current-thread denv)
+    (let ((x (macro-env-param-val (macro-denv-local denv))))
+      (macro-thread-denv-cache1-set! current-thread x)
+      (macro-thread-denv-cache2-set! current-thread x)
+      (macro-thread-denv-cache3-set! current-thread x)
+      (let* ((results ; may get bound to a multiple-values object
+              (thunk))
+             (current-thread
+              (macro-current-thread)))
+        (macro-thread-denv-set! current-thread old-denv)
+        (let ((x (macro-env-param-val (macro-denv-local old-denv))))
+          (macro-thread-denv-cache1-set! current-thread x)
+          (macro-thread-denv-cache2-set! current-thread x)
+          (macro-thread-denv-cache3-set! current-thread x)
+          results)))))
+
+;;;----------------------------------------------------------------------------
+
+
+
+
+
+(define-prim (##dynamic-ref param)
+  (##declare (not interrupts-enabled))
+;;  (##inline-host-statement "console.log('thread', @1@, @2@, @3@)" param 1 1)
+  (cond ((##eq? param ##current-exception-handler)
+         (macro-current-exception-handler))
+        ((##eq? param ##current-input-port)
+         (macro-current-input-port))
+        ((##eq? param ##current-output-port)
+         (macro-current-output-port))
+        (else
+ #; (##inline-host-statement "console.log(' here now thread', @1@, @2@, @3@)"
+                           param (macro-current-thread) (macro-thread-denv-cache1 (current-thread)))
+         (let* ((current-thread
+                 (macro-current-thread))
+                (c1
+                 (macro-thread-denv-cache1 current-thread)))
+           (if (##eq? param (##car c1))
+             (##cdr c1)
+             (let ((c2 (macro-thread-denv-cache2 current-thread)))
+               (if (##eq? param (##car c2))
+                 (begin
+                   (macro-thread-denv-cache2-set! current-thread c1)
+                   (macro-thread-denv-cache1-set! current-thread c2)
+                   (##cdr c2))
+                 (let ((c3 (macro-thread-denv-cache3 current-thread)))
+                   (if (##eq? param (##car c3))
+                     (begin
+                       (macro-thread-denv-cache3-set! current-thread c2)
+                       (macro-thread-denv-cache2-set! current-thread c1)
+                       (macro-thread-denv-cache1-set! current-thread c3)
+                       (##cdr c3))
+                     (let* ((denv
+                             (macro-thread-denv current-thread))
+                            (x
+                             (##env-lookup (macro-denv-local denv) param)))
+                       (if x
+                         (begin
+                           (macro-thread-denv-cache3-set!
+                            current-thread
+                            (macro-thread-denv-cache2 current-thread))
+                           (macro-thread-denv-cache2-set!
+                            current-thread
+                            (macro-thread-denv-cache1 current-thread))
+                           (macro-thread-denv-cache1-set!
+                            current-thread
+                            x)
+                           (##cdr x))
+                         (macro-parameter-descr-value
+                          (macro-parameter-descr param)))))))))))))
+
+(define-prim (##dynamic-let param val thunk)
+  (##declare (not interrupts-enabled))
+  (cond ((##eq? param ##current-exception-handler)
+         (macro-dynamic-bind exception-handler
+          val
+          thunk))
+        ((##eq? param ##current-input-port)
+         (macro-dynamic-bind input-port
+          val
+          thunk))
+        ((##eq? param ##current-output-port)
+         (macro-dynamic-bind output-port
+          val
+          thunk))
+        (else
+         (let* ((param-val
+                 (##cons param val))
+                (denv
+                 (macro-thread-denv (macro-current-thread)))
+                (new-local-denv
+                 (##env-insert (macro-denv-local denv) param-val)))
+           (##dynamic-env-bind
+            (macro-make-denv
+             new-local-denv
+             (macro-denv-dynwind denv)
+             (macro-denv-interrupt-mask denv)
+             (macro-denv-debugging-settings denv)
+             (macro-denv-exception-handler denv)
+             (macro-denv-input-port denv)
+             (macro-denv-output-port denv)
+             (macro-denv-repl-context denv))
+            thunk)))))
+(define-prim (##dynamic-set! param val)
+  (##declare (not interrupts-enabled))
+  (cond ((##eq? param ##current-exception-handler)
+         (macro-current-exception-handler-set! val)
+         (##void))
+        ((##eq? param ##current-input-port)
+         (macro-current-input-port-set! val)
+         (##void))
+        ((##eq? param ##current-output-port)
+         (macro-current-output-port-set! val)
+         (##void))
+        (else
+         (let* ((current-thread
+                 (macro-current-thread))
+                (c1
+                 (macro-thread-denv-cache1 current-thread)))
+           (if (##eq? param (##car c1))
+             (begin
+               (##set-cdr! c1 val)
+               (##void))
+             (let ((c2 (macro-thread-denv-cache2 current-thread)))
+               (if (##eq? param (##car c2))
+                 (begin
+                   (macro-thread-denv-cache2-set! current-thread c1)
+                   (macro-thread-denv-cache1-set! current-thread c2)
+                   (##set-cdr! c2 val)
+                   (##void))
+                 (let ((c3 (macro-thread-denv-cache3 current-thread)))
+                   (if (##eq? param (##car c3))
+                     (begin
+                       (macro-thread-denv-cache3-set! current-thread c2)
+                       (macro-thread-denv-cache2-set! current-thread c1)
+                       (macro-thread-denv-cache1-set! current-thread c3)
+                       (##set-cdr! c3 val)
+                       (##void))
+                     (let* ((denv
+                             (macro-thread-denv current-thread))
+                            (x
+                             (##env-lookup (macro-denv-local denv) param)))
+                       (if x
+                         (begin
+                           (macro-thread-denv-cache3-set!
+                            current-thread
+                            (macro-thread-denv-cache2 current-thread))
+                           (macro-thread-denv-cache2-set!
+                            current-thread
+                            (macro-thread-denv-cache1 current-thread))
+                           (macro-thread-denv-cache1-set!
+                            current-thread
+                            x)
+                           (##set-cdr! x val)
+                           (##void))
+                         (begin
+                           (macro-parameter-descr-value-set!
+                            (macro-parameter-descr param)
+                            val)
+                           (##void)))))))))))))
+(define-prim (##env-insert env param-val)
+  (let* ((param
+          (##car param-val))
+         (hash-param
+          (macro-parameter-descr-hash
+           (macro-parameter-descr param))))
+
+    (define (insert env)
+      (if (##null? env)
+        (macro-make-env
+         param-val
+         '()
+         '())
+        (let* ((x
+                (macro-env-param-val env))
+               (param-x
+                (##car x))
+               (hash-param-x
+                (macro-parameter-descr-hash
+                 (macro-parameter-descr param-x))))
+          (cond ((##fx< hash-param hash-param-x)
+                 (macro-make-env
+                  x
+                  (insert (macro-env-left env))
+                  (macro-env-right env)))
+                ((or (##fx< hash-param-x hash-param)
+                     (##not (##eq? param-x param)))
+                 (macro-make-env
+                  x
+                  (macro-env-left env)
+                  (insert (macro-env-right env))))
+                (else
+                 (macro-make-env
+                  param-val
+                  (macro-env-left env)
+                  (macro-env-right env)))))))
+
+    (insert env)))
+
+(macro-case-target
+
+ ((js)
+  (##inline-host-declaration "
+
+if ((function () { return this !== this.window; })()) { // nodejs?
+
+  os = require('os');
+  // fs = require('fs');
+  vm = require('vm');
+  process = require('process');
+  // child_process = require('child_process')
+
+  g_os_encode_error = function (exn) {
+    switch (exn.code) {
+      case 'EPERM':  return -1;
+      case 'ENOENT': return -2;
+      case 'EINTR':  return -4;
+      case 'EIO':    return -5;
+      case 'EBADF':  return -9;
+      case 'EACCES': return -13;
+      case 'EEXIST': return -17;
+      case 'EAGAIN': return -35;
+    }
+    return -8888;
+  };
+
+  g_os_decode_error = function (code) {
+    switch (code) {
+      case -1:  return 'EPERM (Operation not permitted)';
+      case -2:  return 'ENOENT (No such file or directory)';
+      case -4:  return 'EINTR (Interrupted system call)';
+      case -5:  return 'EIO (Input/output error)';
+      case -9:  return 'EBADF (Bad file descriptor)';
+      case -13: return 'EACCES (Permission denied)';
+      case -17: return 'EEXIST (File exists)';
+      case -35: return 'EAGAIN (Resource temporarily unavailable)';
+    }
+    return 'E??? (unknown error)';
+  };
+}
+
+g_current_time = function () {
+  return new Date().getTime() / 1000;
+};
+
+g_start_time = g_current_time();
+
+g_set_process_times = function (vect) {
+  var elapsed = g_current_time() - g_start_time;
+  vect.elems[0] = elapsed;
+  vect.elems[1] = 0.0;
+  vect.elems[2] = elapsed;
+  return vect;
+};
+
+G_Device = function (fd) {
+  this.fd = fd;
+  this.rbuf = new Uint8Array(1024);
+  this.rlo = 1;
+  this.rhi = 1; // 0 would mean EOF
+};
+
+g_os_debug = false;
+
+"))
+
+ ((python)
+  (##inline-host-declaration "
+
+import os
+import pwd
+import grp
+import stat
+import time
+import errno
+import getpass
+import functools
+
+def g_os_encode_error(exn):
+    e = exn.errno
+    if e == errno.EPERM:
+      return -1
+    elif e == errno.ENOENT:
+        return -2
+    elif e == errno.EINTR:
+        return -5
+    elif e == errno.EIO:
+        return -9
+    elif e == errno.EBADF:
+        return -13
+    elif e == errno.EACCES:
+        return -17
+    elif e == errno.EEXIST:
+        return -35
+    else:
+        return -8888
+
+def g_os_decode_error(code):
+    if code == -1:
+        return 'EPERM (Operation not permitted)'
+    elif code == -2:
+        return 'ENOENT (No such file or directory)'
+    elif code == -4:
+        return 'EINTR (Interrupted system call)'
+    elif code == -5:
+        return 'EIO (Input/output error)'
+    elif code == -9:
+        return 'EBADF (Bad file descriptor)'
+    elif code == -13:
+        return 'EACCES (Permission denied)'
+    elif code == -17:
+        return 'EEXIST (File exists)'
+    elif code == -35:
+        return 'EAGAIN (Resource temporarily unavailable)'
+    else:
+        return 'E??? (unknown error)'
+
+def g_current_time():
+    return time.time()
+
+g_start_time = g_current_time()
+
+def g_set_process_times(vect):
+    elapsed = g_current_time() - g_start_time
+    vect.elems[0] = elapsed
+    vect.elems[1] = 0.0
+    vect.elems[2] = elapsed
+    return vect
+
+class G_Device:
+
+    def __init__(self, fd):
+        self.fd = fd
+
+
+g_os_debug = False
+
+"))
+
+ (else))
+(define-prim (##os-condvar-select! devices timeout)
+  (##first-argument #f ##feature-port-fields)
+  (macro-case-target
+
+   ((js)
+    (##inline-host-declaration "
+
+g_os_condvar_select_should_sleep = true;
+
+g_os_condvar_select = function (devices_scm, timeout_scm) {
+
+  if (g_os_debug)
+    console.log('g_os_condvar_select(devices, timeout)  ***not fully implemented***');
+
+  var at_least_1_device = (devices_scm !== false &&
+                           devices_scm !== devices_scm.slots[g_BTQ_DEQ_NEXT]);
+
+  var timeout_ms;
+
+  if (timeout_scm === false)
+    timeout_ms = 0;
+  else if (timeout_scm === true)
+    timeout_ms = 999999;
+  else
+    timeout_ms = (timeout_scm.elems[0]-g_current_time()) * 1000;
+
+  if (!at_least_1_device || g_os_condvar_select_should_sleep) {
+
+    if (at_least_1_device)
+      timeout_ms = 10; // give browser time to refresh
+
+    g_os_condvar_select_should_sleep = false;
+
+    var ra = g_r0;
+    g_r0 = null; // exit trampoline
+
+    setTimeout(function () { g_trampoline(ra); }, // resume execution
+               Math.max(0, timeout_ms))
+
+    return g_host2scm(0);
+  }
+
+  g_os_condvar_select_should_sleep = true;
+
+  if (devices_scm !== false) {
+
+    var condvar_scm = devices_scm.slots[g_BTQ_DEQ_NEXT];
+
+    while (condvar_scm !== devices_scm) {
+      var owner = condvar_scm.slots[g_BTQ_OWNER];
+      var dev = g_foreign2host(condvar_scm.slots[g_CONDVAR_NAME]);
+      if (dev.fd === -4) // console?
+        condvar_scm.slots[g_BTQ_OWNER] = owner | 1; // mark as 'ready'
+      else
+        condvar_scm.slots[g_BTQ_OWNER] = owner & ~1; // mark as 'not ready'
+      condvar_scm = condvar_scm.slots[g_BTQ_DEQ_NEXT];
+    }
+
+  }
+
+  return g_host2scm(0);
+};
+
+")
+    (##inline-host-expression
+     "g_os_condvar_select(@1@,@2@)"
+     devices
+     timeout))
+
+   ((python)
+    (##inline-host-declaration "
+
+def g_os_condvar_select(devices_scm, timeout_scm):
+
+    if g_os_debug:
+        print('g_os_condvar_select(devices, timeout)  ***not fully implemented***')
+
+    return g_host2scm(0)  # no error
+
+")
+    (##inline-host-expression
+     "g_os_condvar_select(@1@,@2@)"
+     devices
+     timeout))
+
+   (else
+    (println "unimplemented ##os-condvar-select! called")
+    -5555)))
+
+(define (##enable-interrupts!) #f)
+
+;;; Implementation of blocked thread queues and timeout queues.
+
+(implement-btq) ;; defines ##btq-insert!, etc
+(implement-toq) ;; defines ##toq-insert!, etc
+;;;----------------------------------------------------------------------------
+;;;
+;;; ====================
+(define-prim (##parameter? obj)
+  (##declare (not interrupts-enabled))
+  (and (##procedure? obj)
+       (##closure? obj)
+       (##eq? (##closure-code obj)
+              (##closure-code ##current-exception-handler))))
+
+(##define-macro (macro-parameter-descr param)
+  `(##closure-ref ,param 1))
+
+(define-prim (##parameterize1 param val thunk)
+  (##declare (not interrupts-enabled))
+  (macro-check-procedure param 1 (##parameterize1 param val thunk)
+    (macro-check-procedure thunk 3 (##parameterize1 param val thunk)
+      (if (##parameter? param)
+        (##dynamic-let
+         param
+         ((macro-parameter-descr-filter (macro-parameter-descr param)) val)
+         thunk)
+        (let ((save (param)))
+          (##dynamic-wind
+           (lambda () ;; before
+             (param val))
+           thunk
+           (lambda () ;; after
+             (param save))))))))
+
+(##include "~~lib/gambit/parameter/parameter#.scm")
+
+;;; now in symkey!
+#;(define-prim (##partial-bit-reverse i)
+
+  (##define-macro (bit n)
+    `(##fxarithmetic-shift-left
+      (##fxand i ,(expt 2 n)) ,(- 28 (* 2 n))))
+
+  (##fx+
+   (bit 0)
+   (##fx+
+    (bit 1)
+    (##fx+
+     (bit 2)
+     (##fx+
+      (bit 3)
+      (##fx+
+       (bit 4)
+       (##fx+
+        (bit 5)
+        (##fx+
+         (bit 6)
+         (##fx+
+          (bit 7)
+          (##fx+
+           (bit 8)
+           (##fx+
+            (bit 9)
+            (##fx+
+             (bit 10)
+             (##fx+
+              (bit 11)
+              (##fx+
+               (bit 12)
+               (##fx+
+                (bit 13)
+                (bit 14))))))))))))))))
+
+(define ##parameter-counter 0)
+
+(define-prim (##make-parameter
+              init
+              #!optional
+              (f (macro-absent-obj)))
+  (let ((filter
+         (if (##eq? f (macro-absent-obj))
+           (lambda (x) x)
+           f)))
+    (macro-check-procedure filter 2 (make-parameter init f)
+      (let* ((val
+              (filter init))
+             (new-count
+              (+ ##parameter-counter 1)))
+        ;; Note: it is unimportant if the increment of
+        ;; ##parameter-counter is not atomic; it simply means a
+        ;; possible close repetition of the same hash code
+        (set! ##parameter-counter new-count)
+        (let ((descr
+               (macro-make-parameter-descr
+                val
+                (##partial-bit-reverse new-count)
+                filter)))
+          (letrec ((param
+                    (lambda (#!optional (new-val (macro-absent-obj)))
+                      (if (##eq? new-val (macro-absent-obj))
+                        (##dynamic-ref param)
+                        (##dynamic-set!
+                         param
+                         ((macro-parameter-descr-filter descr) new-val))))))
+            param))))))
+
+(define-prim (make-parameter init #!optional (f (macro-absent-obj)))
+  (macro-force-vars (f)
+    (##make-parameter init f)))
+
+;;;============================================================================
+
+(define (##os-path-normalize-directory path)
+  (##declare (not interrupts-enabled))
+  (macro-case-target
+
+   ((js)
+    (##inline-host-declaration "
+
+g_os_path_normalize_directory = function (path) {
+  if ((function () { return this !== this.window; })()) { // nodejs?
+    var old = process.cwd();
+    var dir;
+    if (path === false) {
+      dir = old;
+    } else {
+      try {
+        process.chdir(path);
+      } catch (exn) {
+        if (exn instanceof Error && exn.hasOwnProperty('code')) {
+          return g_host2scm(g_os_encode_error(exn));
+        } else {
+          throw exn;
+        }
+      }
+      dir = process.cwd();
+      process.chdir(old);
+    }
+    if (dir[dir.length-1] === '/' || dir[dir.length-1] === '\\\\') {
+      return g_host2scm(dir);
+    } else if (dir[0] === '/') {
+      return g_host2scm(dir + '/')
+    } else {
+      return g_host2scm(dir + '\\\\')
+    }
+  } else {
+    var loc = window.location.href;
+    var root = '/' + loc.slice(0, 1+loc.lastIndexOf('/'));
+    if (path === false) {
+      return g_host2scm(root);
+    } else {
+      return g_host2scm(root + path.slice((path[0] === '/') ? 1 : 0));
+    }
+  }
+};
+
+")
+    (##inline-host-expression "g_os_path_normalize_directory(g_scm2host(@1@))" path))
+
+   ((python)
+    (##inline-host-declaration "
+
+def g_os_path_normalize_directory(path):
+    old = os.getcwd()
+    if path is False:
+        dir = old
+    else:
+        try:
+            os.chdir(path)
+        except OSError as exn:
+            return g_host2scm(g_os_encode_error(exn))
+        dir = os.getcwd()
+        os.chdir(old)
+    if dir[-1] == '/' or dir[-1] == '\\\\':
+        return g_host2scm(dir)
+    elif dir[0] == '/':
+        return g_host2scm(dir + '/')
+    else:
+        return g_host2scm(dir + '\\\\')
+
+")
+    (##inline-host-expression "g_os_path_normalize_directory(g_scm2host(@1@))" path))
+
+   (else
+    (println "unimplemented ##os-path-normalize-directory called with path=")
+    (println path)
+    "/")))
+(define ##initial-current-directory
+  (let ((current-dir
+         (##os-path-normalize-directory #f)))
+    (if (##fixnum? current-dir)
+        (##exit-with-err-code current-dir)
+        current-dir)))
+
+(define-prim (##path-normalize-directory-existing path)
+  (let ((normalized-dir
+         (##os-path-normalize-directory (##path-expand path))))
+    (if (##fixnum? normalized-dir)
+        (##raise-os-exception #f normalized-dir ##current-directory path)
+        normalized-dir)))
+
+(define-prim (##current-directory-filter val)
+  (if (##eq? val (macro-absent-obj))
+      ##initial-current-directory
+      (macro-check-string val 1 (##current-directory val)
+        (##path-normalize-directory-existing val))))
+
+(define ##current-directory
+  (##make-parameter
+   (macro-absent-obj)
+   ##current-directory-filter))
+
+(define current-directory
+  ##current-directory)
+
+(##define-macro (macro-parameter-descr param)
+  `(##closure-ref ,param 1))
+
+(define-prim (##make-tgroup name parent)
+  (##declare (not interrupts-enabled))
+  (macro-make-tgroup name parent))
+
+(define-prim (##make-root-thread
+              thunk
+              name
+              tgroup
+              input-port
+              output-port)
+
+  (##declare (not interrupts-enabled))
+
+  (let* ((interrupt-mask
+          0)
+         (debugging-settings
+          0)
+         (local-binding
+          (##cons ##current-directory
+                  (macro-parameter-descr-value
+                   (macro-parameter-descr ##current-directory)))))
+
+    ;; these macros are defined to prevent the normal thread
+    ;; inheritance mechanism when a root thread is created
+
+    (##define-macro (macro-current-thread)
+      `#f)
+
+    (##define-macro (macro-thread-denv thread)
+      `#f)
+
+    (##define-macro (macro-denv-local denv)
+      `(macro-make-env local-binding '() '()))
+
+    (##define-macro (macro-denv-dynwind denv)
+      `##initial-dynwind)
+
+    (##define-macro (macro-denv-interrupt-mask denv)
+      `interrupt-mask)
+
+    (##define-macro (macro-denv-debugging-settings denv)
+      `debugging-settings)
+
+    (##define-macro (macro-denv-input-port denv)
+      `(##cons ##current-input-port input-port))
+
+    (##define-macro (macro-denv-output-port denv)
+      `(##cons ##current-output-port output-port))
+
+    (##define-macro (macro-thread-denv-cache1 thread)
+      `local-binding)
+
+    (##define-macro (macro-thread-denv-cache2 thread)
+      `local-binding)
+
+    (##define-macro (macro-thread-denv-cache3 thread)
+      `local-binding)
+
+    (##define-macro (macro-thread-floats thread)
+      `#f)
+
+    (##define-macro (macro-base-priority floats)
+      `(macro-thread-root-base-priority))
+
+    (##define-macro (macro-quantum floats)
+      `(macro-thread-root-quantum))
+
+    (##define-macro (macro-priority-boost floats)
+      `(macro-thread-root-priority-boost))
+
+    ;; create root thread
+
+    (macro-make-thread thunk name tgroup)))
+
+(define-prim (make-root-thread
+              thunk
+              #!optional
+              (n (macro-absent-obj))
+              (tg (macro-absent-obj))
+              (ip (macro-absent-obj))
+              (op (macro-absent-obj)))
+  (macro-force-vars (thunk n tg ip op)
+    (let* ((name
+            (if (##eq? n (macro-absent-obj))
+              (##void)
+              n))
+           (tgroup
+            (if (##eq? tg (macro-absent-obj))
+              (macro-thread-tgroup (macro-current-thread))
+              tg))
+           (input-port
+            (if (##eq? ip (macro-absent-obj))
+              ##stdin-port
+              ip))
+           (output-port
+            (if (##eq? op (macro-absent-obj))
+              ##stdout-port
+              op)))
+      (macro-check-procedure thunk 1 (make-root-thread thunk n tg ip op)
+        (macro-check-tgroup tgroup 3 (make-root-thread thunk n tg ip op)
+          (macro-check-input-port input-port 4 (make-root-thread thunk n tg ip op)
+            (macro-check-output-port output-port 5 (make-root-thread thunk n tg ip op)
+                                     (##make-root-thread thunk name tgroup input-port output-port))))))))
+
+(define (##startup-processor!)
+
+  (declare (not interrupts-enabled))
+
+  (macro-processor-init! (##current-processor) (##current-processor-id))
+  (##primitive-unlock! (##current-processor) 1 9)
+
+  (let* ((tgroup
+          (##make-tgroup 'local #f))
+         (input-port
+          ##stdin-port)
+         (output-port
+          ##stdout-port)
+         (thread
+          (##make-root-thread
+           #f
+           'local
+           tgroup
+           input-port
+           output-port)))
+
+    (macro-processor-current-thread-set!
+     (macro-current-processor)
+     thread)
+
+    (##btq-insert! (macro-current-processor) thread)
+    )
+
+  (##enable-interrupts!)
+
+  (##inline-host-statement "(() => {
+  async function startGambitProcessor() {
+    const yup = await(@1@)();
+   return yup;
+ }
+
+ startGambitProcessor();
+})()" (lambda ()
+        (let loop ()
+          (declare (interrupts-enabled))
+          (##os-condvar-select! #f #t) ;; wait for interrupt
+          (loop)))))
+#+end_src
+
+*** ~min/values.scm~
+
+#+begin_src scheme :tangle ../gambit/min/values.scm
+;;; Copyright (c) 1994-2020 by Marc Feeley, All Rights Reserved.
+
+;;; Values.
+
+(define-prim (##make-values len #!optional (init 0))
+  (let ((vals (##make-vector len init)))
+    (##subtype-set! vals (macro-subtype-boxvalues))
+    vals))
+
+(define-prim (##values-length vals)
+  (##vector-length vals))
+
+(define-prim (##values-ref vals i)
+  (##vector-ref vals i))
+
+(define-prim (##values-set! vals i val)
+  (##vector-set! vals i val))
+
+(define-prim (##list->values lst)
+  (let loop1 ((x lst) (n 0))
+    (if (##pair? x)
+        (loop1 (##cdr x) (##fx+ n 1))
+        (let ((vals (##make-values n)))
+          (let loop2 ((x lst) (i 0))
+            (if (and (##pair? x)  ;; double check in case another
+                     (##fx< i n)) ;; thread mutates the list
+                (let ((elem (##car x)))
+                  (##values-set! vals i elem)
+                  (loop2 (##cdr x) (##fx+ i 1)))
+                vals))))))
+
+(define-prim (##values->list vals)
+  (let ((start 0)
+        (end (##values-length vals)))
+    (let loop ((lst '()) (i (##fx- end 1)))
+      (if (##fx< i start)
+          lst
+          (loop (##cons (##values-ref vals i) lst) (##fx- i 1))))))
+
+(define-prim (##values
+              #!optional
+              (val1 (macro-absent-obj))
+              (val2 (macro-absent-obj))
+              (val3 (macro-absent-obj))
+              #!rest
+              others)
+  (cond ((##eq? val2 (macro-absent-obj))
+         (if (##eq? val1 (macro-absent-obj))
+             (##values)
+             val1))
+        ((##eq? val3 (macro-absent-obj))
+         (##values val1 val2))
+        ((##null? others)
+         (##values val1 val2 val3))
+        (else
+         (##list->values
+          (##cons val1 (##cons val2 (##cons val3 others)))))))
+
+(define-prim (values
+              #!optional
+              (val1 (macro-absent-obj))
+              (val2 (macro-absent-obj))
+              (val3 (macro-absent-obj))
+              #!rest
+              others)
+  (cond ((##eq? val2 (macro-absent-obj))
+         (if (##eq? val1 (macro-absent-obj))
+           (##values)
+           val1))
+        ((##eq? val3 (macro-absent-obj))
+         (##values val1 val2))
+        ((##null? others)
+         (##values val1 val2 val3))
+        (else
+         (##list->values
+          (##cons val1 (##cons val2 (##cons val3 others)))))))
+
+(define-prim (##call-with-values producer consumer)
+  (let ((results ;; may get bound to a multiple-values object
+         (producer)))
+    (if (##not (##values? results))
+        (consumer results)
+        (let ((len (##values-length results)))
+          (cond ((##fx= len 2)
+                 (consumer (##values-ref results 0)
+                           (##values-ref results 1)))
+                ((##fx= len 3)
+                 (consumer (##values-ref results 0)
+                           (##values-ref results 1)
+                           (##values-ref results 2)))
+                ((##fx= len 0)
+                 (consumer))
+                (else
+                 (##apply consumer (##values->list results))))))))
+
+(define-prim (call-with-values producer consumer)
+  (macro-force-vars (producer consumer)
+    (macro-check-procedure producer 1 (call-with-values producer consumer)
+      (macro-check-procedure consumer 2 (call-with-values producer consumer)
+        (##call-with-values producer consumer)))))
+
+#+end_src
+*** ~min/exception.scm~
+
+#+begin_src scheme :tangle ../gambit/min/exception.scm
+
+(##include "~~/lib/_thread#.scm")
+(define ##current-exception-handler
+  (##make-parameter
+   (lambda (exc)
+     (##thread-end-with-uncaught-exception! exc))
+   (lambda (val)
+     (macro-check-procedure val 1 (##current-exception-handler val)
+       val))))
+
+(define current-exception-handler
+  ##current-exception-handler)
+
+;;;----------------------------------------------------------------------------
+
+;;; User accessible primitives for exception handling.
+
+(define-prim (##with-exception-handler handler thunk)
+  (macro-dynamic-bind exception-handler
+   handler
+   thunk))
+
+(define-prim (with-exception-handler handler thunk)
+  (macro-force-vars (handler thunk)
+    (macro-check-procedure handler 1 (with-exception-handler handler thunk)
+      (macro-check-procedure thunk 2 (with-exception-handler handler thunk)
+        (macro-dynamic-bind exception-handler
+         handler
+         thunk)))))
+
+(define-prim (##with-exception-catcher catcher thunk)
+  (##continuation-capture
+   (lambda (cont)
+     (macro-dynamic-bind exception-handler
+      (lambda (exc)
+        (##continuation-graft cont catcher exc))
+      thunk))))
+
+(define-prim (with-exception-catcher catcher thunk)
+  (macro-force-vars (catcher thunk)
+    (macro-check-procedure catcher 1 (with-exception-catcher catcher thunk)
+      (macro-check-procedure thunk 2 (with-exception-catcher catcher thunk)
+        (##with-exception-catcher catcher thunk)))))
+
+(define-prim (##raise obj);;;;;;;;;;;;;;;;;;
+  (macro-raise obj))
+
+(define-prim (raise obj)
+  (macro-raise obj))
+
+(define-prim (##abort obj);;;;;;;;;;;;;;;;;;;;;;;;;;
+  (macro-abort obj))
+
+(define-prim (abort obj)
+  (macro-abort obj))
+
+(define (##r7rs-with-exception-handler handler thunk)
+  (let ((original-eh (macro-current-exception-handler)))
+    (macro-dynamic-bind
+     exception-handler
+     (lambda (exc)
+       (macro-dynamic-bind
+        exception-handler
+        original-eh
+        (lambda ()
+          (handler exc))))
+     thunk)))
+
+(define (##r7rs-with-exception-catcher handler thunk)
+  (##continuation-capture
+   (lambda (cont)
+     (##r7rs-with-exception-handler
+      (lambda (exc)
+        (##continuation-graft cont handler exc))
+      thunk))))
+
+(define (##r7rs-raise exc) ;; raise noncontinuable exception
+  (##abort exc))
+
+(define (##r7rs-raise-continuable exc) ;; raise continuable exception
+  (##raise exc))
+
+;;;----------------------------------------------------------------------------
+#+end_src
+
+*** ~min/module-registry.scm~
+
+*Gambit* has modules and namespaces. We want to be able to redefine things at
+ "runtime", and that means being able to reset the module registry.
+
+#+begin_src javascript :noweb-ref g_module_registry_reset
+g_module_registry_reset = function () {
+  g_module_count = 0;
+  g_module_map = {};
+  g_module_table = null;
+  g_module_latest_registered = null;
+};
+#+end_src
+
+When the registry is (re)initialized it should be reset.
+
+#+begin_src javascript :noweb-ref g_module_registry_init
+g_module_registry_init = function (link_info) {
+  var n = link_info.length;
+  var i = 0;
+  g_module_registry_reset();
+  g_module_table = new Array(n);
+  while (i < n) {
+    var info = link_info[i];
+    g_module_map[info.name] = info;
+    g_module_table[i] = null;
+    ++i;
+  }
+};
+#+end_src
+
+Some modules need not be registered modules. They may be refugees, or just
+sneaking in under the radar.
+
+To keep this code description simple, I've taken the initialization of a gambit
+module and have made it so that if the ~##program-descr~ is bound we just run
+the init function.
+
+This way when a ~.js~ file is loaded (imported? required? <script/>'ed?") the
+code is run as the registry has been initialized.
+
+We also keep track of all the modules as I think this will come in handy.
+
+#+begin_src javascript :noweb-ref g_module_register
+g_module_name = function (module_descr) {
+  var temp = module_descr[0];
+  var name = temp[temp.length - 1].name;
+  return name;
+};
+
+g_module_init = function(module_descr) {
+  g_sp = -1;
+  g_stack[++g_sp] = void 0;
+  g_r0 = g_underflow;
+  g_nargs = 0;
+  g_trampoline(module_descr[4]);
+};
+
+gx_gambit_module_table = [];
+
+g_module_register = function (module_descr) {
+  // Keep track of all registered modules.
+  gx_gambit_module_table.push(module_descr);
+
+  if ( typeof g_glo['##program-descr'] === 'object' ) {
+    g_module_init(module_descr);
+  } else {
+    var temp = module_descr[0];
+    var name = temp[temp.length - 1].name;
+    var info = Object.prototype.hasOwnProperty.call(g_module_map,name) ? g_module_map[name] : null;
+    g_module_latest_registered = module_descr;
+    if (!(info === null || g_module_count === g_module_table.length)) {
+      var index = info.index;
+      var old = g_module_table[index];
+      g_module_table[index] = module_descr;
+      if (old === null) {
+        ++g_module_count;
+        if (g_module_count === g_module_table.length) {
+          g_glo["##program-descr"] = [g_module_table,null,false];
+          temp = g_module_table[g_module_table.length - 1][0];
+          g_glo["##vm-main-module-ref"] = temp[temp.length - 1];
+          g_sp = -1;
+          g_stack[++g_sp] = void 0;
+          g_r0 = g_underflow;
+          g_nargs = 0;
+          g_trampoline(g_module_table[0][4]);
+        }
+      }
+    }
+  }
+};
+
+#+end_src
+
+#+begin_src scheme :noweb yes :tangle "../gambit/min/module-registry.scm"
+
+(##inline-host-declaration #<<EOF
+{%g_module_register%}
+
+{%g_module_registry_reset%}
+
+{%g_module_registry_init%}
+
+EOF
+)
+#+end_src
+
+*** ~min/nums.scm~
+:PROPERTIES:
+:CUSTOM_ID: minNums
+:END:
+
+It seems that the primative ~+~, ~-~, ~/~ and ~*~ only use fixnums.
+
+For now we'll hack it up by using javascript only and see how it goes. The
+reasoning behind this is that my compilations of ~_num.scm~ arrives in a 7.1MB
+~.js~ file. Yikes.
+
+We should turn to https://mathjs.org/ for rationals and complex numbers. For now
+they are errors.
+
+#+begin_src scheme :tangle ../gambit/min/nums.scm :mkdirp yes
+
+
+(define-prim (##number->string n)
+  (##inline-host-expression
+   "(() => { n = g_scm2host(@1@) ; return g_host2scm(n.toString()); })();" n))
+
+(define-prim number->string ##number->string)
+;;;----------------------------------------------------------------------------
+
+;;; Numerical type predicates.
+(define-prim (##number? x)
+  (##complex? x))
+
+(define-prim (##complex? x)
+  (macro-number-dispatch x #f
+    #t ;; x = fixnum
+    #t ;; x = bignum
+    #t ;; x = ratnum
+    #t ;; x = flonum
+    #t)) ;; x = cpxnum
+
+(define-prim (number? x)
+  (macro-force-vars (x)
+    (##number? x)))
+
+(define-prim (complex? x)
+  (macro-force-vars (x)
+    (##complex? x)))
+
+;; (define-prim (##real? x)
+;;   (macro-number-dispatch x #f
+;;     #t ;; x = fixnum
+;;     #t ;; x = bignum
+;;     #t ;; x = ratnum
+;;     #t ;; x = flonum
+;;     (macro-cpxnum-real? x))) ;; x = cpxnum
+
+;; (define-prim (real? x)
+;;   (macro-force-vars (x)
+;;     (##real? x)))
+
+;; (define-prim (##rational? x)
+;;   (macro-number-dispatch x #f
+;;     #t ;; x = fixnum
+;;     #t ;; x = bignum
+;;     #t ;; x = ratnum
+;;     (macro-flonum-rational? x) ;; x = flonum
+;;     (macro-cpxnum-rational? x))) ;; x = cpxnum
+
+;; (define-prim (rational? x)
+;;   (macro-force-vars (x)
+;;     (##rational? x)))
+
+;; (define-prim (##integer? x)
+;;   (macro-number-dispatch x #f
+;;     #t ;; x = fixnum
+;;     #t ;; x = bignum
+;;     #f ;; x = ratnum
+;;     (macro-flonum-int? x) ;; x = flonum
+;;     (macro-cpxnum-int? x))) ;; x = cpxnum
+
+;; (define-prim (integer? x)
+;;   (macro-force-vars (x)
+;;     (##integer? x)))
+
+(define-prim (##exact-integer? x)
+  (macro-exact-int? x))
+
+(define-prim (exact-integer? x)
+   (macro-force-vars (x)
+     (macro-exact-int? x)))
+
+
+(define-prim (##+ . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a + b, 0) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim + ##+)
+(define-prim (##* . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a * b, 1) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim * ##*)
+(define-prim (##- . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a - b) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim - ##-)
+(define-prim (##/ . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a / b, 1) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim / ##/)
+
+
+(define-prim (##= . xs)
+  (##inline-host-expression
+   "((xs) => {
+      const _ret = xs.reduce((a, b) => { return (a == b) ?  b : NaN });
+      return !isNaN(_ret)})(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim = ##=)
+
+(define-prim (##< . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a < b) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim < ##<)
+(define-prim (##> . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a > b) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim > ##>)
+
+
+(define-prim (##<= . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a <= b) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+ (define-prim <= ##<=)
+(define-prim (##>= . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a >= b) })(g_scm2host(@1@));"
+   (##list->vector xs)))
+ (define-prim >= ##>=)
+
+(define-prim (##expt x y)
+  (##inline-host-expression "( @1@ ** @2@ )" x y))
+
+(define-prim (expt x y)
+  (macro-force-vars (x y)
+    (##expt x y)))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; abs
+(define-prim (##abs x)
+ (##inline-host-expression "Math.abs(@1@);" x))
+
+(define-prim (abs x)
+  (macro-force-vars (x)
+    (##abs x)))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; gcd, lcm
+
+(define-prim (##gcd . xs)
+  (##inline-host-expression
+"((arr) => {
+  var i, y,
+      n = arr.length,
+      x = Math.abs(arr[0]);
+
+  for (i = 1; i < n; i++) {
+    y = Math.abs(arr[i]);
+
+    while (x && y) {
+      (x > y) ? x %= y : y %= x;
+    }
+    x += y;
+  }
+  return x;
+})(g_scm2host(@1@))" (##list->vector xs)))
+
+(define-prim gcd ##gcd)
+
+(define-prim (##lcm . xs)
+  (##inline-host-expression "((A) =>
+{
+    var n = A.length, a = Math.abs(A[0]);
+    for (var i = 1; i < n; i++)
+     { var b = Math.abs(A[i]), c = a;
+       while (a && b){ a > b ? a %= b : b %= a; }
+       a = Math.abs(c*A[i])/(a+b);
+     }
+    return a;
+})(g_scm2host(@1@));" (##list->vector xs)))
+
+(define-prim lcm ##lcm)
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(define-prim (##floor x)
+
+  (define (type-error)
+    (##fail-check-finite-real 1 floor x))
+
+  (macro-number-dispatch x (type-error)
+    x
+    x
+    (let ((num (macro-ratnum-numerator x))
+          (den (macro-ratnum-denominator x)))
+      (if (##negative? num)
+          (##quotient (##- num (##- den 1)) den)
+          (##quotient num den)))
+    (if (##flfinite? x)
+        (##flfloor x)
+        (type-error))
+    (if (macro-cpxnum-real? x)
+        (##floor (macro-cpxnum-real x))
+        (type-error))))
+
+(define-prim (floor x)
+  (macro-force-vars (x)
+    (##floor x)))
+
+(define-prim (##ceiling x)
+
+  (define (type-error)
+    (##fail-check-finite-real 1 ceiling x))
+
+  (macro-number-dispatch x (type-error)
+    x
+    x
+    (let ((num (macro-ratnum-numerator x))
+          (den (macro-ratnum-denominator x)))
+      (if (##negative? num)
+          (##quotient num den)
+          (##quotient (##+ num (##- den 1)) den)))
+    (if (##flfinite? x)
+        (##flceiling x)
+        (type-error))
+    (if (macro-cpxnum-real? x)
+        (##ceiling (macro-cpxnum-real x))
+        (type-error))))
+
+(define-prim (ceiling x)
+  (macro-force-vars (x)
+    (##ceiling x)))
+
+
+;; ;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(define-prim (##string->number str #!optional (rad 10))
+  (if (= rad 10)
+    (##inline-host-expression "Number(g_scm2host(@1@))" str)
+    (##inline-host-expression "parseInt(g_scm2host(@1@), @2@)" str rad)))
+
+(define-prim string->number ##string->number)
+
+;;;----------------------------------------------------------------------------
+
+;; UTF-8 encoding and decoding
+
+(implement-library-type-invalid-utf8-encoding-exception)
+
+(define-prim (##raise-invalid-utf8-encoding-exception proc . args)
+  (##extract-procedure-and-arguments
+   proc
+   args
+   #f
+   #f
+   #f
+   (lambda (procedure arguments dummy1 dummy2 dummy3)
+     (macro-raise
+      (macro-make-invalid-utf8-encoding-exception
+       procedure
+       arguments)))))
+
+(define-prim (##string->utf8-length
+              str
+              #!optional
+              (start 0)
+              (end (##string-length str)))
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (let loop ((i start)
+             (len 0))
+    (if (fx< i end)
+        (let ((c (char->integer (string-ref str i))))
+          (cond ((fx<= c #x7f)
+                 ;; 1 byte encoding (ASCII)
+                 (loop (fx+ i 1)
+                       (fx+ len 1)))
+                ((fx<= c #x7ff)
+                 ;; 2 byte encoding
+                 (loop (fx+ i 1)
+                       (fx+ len 2)))
+                ((fx<= c #xffff)
+                 ;; 3 byte encoding
+                 (loop (fx+ i 1)
+                       (fx+ len 3)))
+                (else
+                 ;; 4 byte encoding
+                 (loop (fx+ i 1)
+                       (fx+ len 4)))))
+        len)))
+
+(define-prim (##string->utf8
+              str
+              #!optional
+              (start 0)
+              (end (##string-length str)))
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (let* ((len (##string->utf8-length str start end))
+         (result (make-u8vector len)))
+    (if (fx= len (fx- end start))
+        (let loop1 ((i 0))
+          (if (fx< i len)
+              (begin
+                (u8vector-set!
+                 result
+                 i
+                 (char->integer
+                  (string-ref str (fx+ start i))))
+                (loop1 (fx+ i 1)))
+              result))
+        (let loop2 ((i start)
+                    (j 0))
+          (if (and (fx< i end)
+                   (fx< j len)) ;; account for str mutation by other thread
+              (let ((c (char->integer (string-ref str i))))
+                (cond ((fx<= c #x7f)
+                       ;; 1 byte encoding (ASCII)
+                       (u8vector-set! result j c)
+                       (loop2 (fx+ i 1)
+                              (fx+ j 1)))
+                      ((fx<= c #x7ff)
+                       ;; 2 byte encoding
+                       (u8vector-set!
+                        result
+                        j
+                        (fx+ #xc0 (fxarithmetic-shift-right c 6)))
+                       (u8vector-set!
+                        result
+                        (fx+ j 1)
+                        (fx+ #x80 (fxand #x3f c)))
+                       (loop2 (fx+ i 1)
+                              (fx+ j 2)))
+                      ((fx<= c #xffff)
+                       ;; 3 byte encoding
+                       (u8vector-set!
+                        result
+                        j
+                        (fx+ #xe0 (fxarithmetic-shift-right c 12)))
+                       (u8vector-set!
+                        result
+                        (fx+ j 1)
+                        (fx+ #x80 (fxand #x3f (fxarithmetic-shift-right c 6))))
+                       (u8vector-set!
+                        result
+                        (fx+ j 2)
+                        (fx+ #x80 (fxand #x3f c)))
+                       (loop2 (fx+ i 1)
+                              (fx+ j 3)))
+                      (else
+                       ;; 4 byte encoding
+                       (u8vector-set!
+                        result
+                        j
+                        (fx+ #xf0 (fxarithmetic-shift-right c 18)))
+                       (u8vector-set!
+                        result
+                        (fx+ j 1)
+                        (fx+ #x80 (fxand #x3f (fxarithmetic-shift-right c 12))))
+                       (u8vector-set!
+                        result
+                        (fx+ j 2)
+                        (fx+ #x80 (fxand #x3f (fxarithmetic-shift-right c 6))))
+                       (u8vector-set!
+                        result
+                        (fx+ j 3)
+                        (fx+ #x80 (fxand #x3f c)))
+                       (loop2 (fx+ i 1)
+                              (fx+ j 4)))))
+              result)))))
+
+(define-prim (string->utf8
+              str
+              #!optional
+              (start (macro-absent-obj))
+              (end (macro-absent-obj)))
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+  (namespace ("" string->utf8)) ;; but not string->utf8 to ##string->utf8
+
+  (macro-force-vars (str start end)
+    (macro-check-string
+      str
+      1
+      (string->utf8 str start end)
+      (if (eq? start (macro-absent-obj))
+          (##string->utf8 str)
+          (macro-check-index-range-incl
+            start
+            2
+            0
+            (string-length str)
+            (string->utf8 str start end)
+            (if (eq? end (macro-absent-obj))
+                (##string->utf8 str start)
+                (macro-check-index-range-incl
+                  end
+                  3
+                  start
+                  (string-length str)
+                  (string->utf8 str start end)
+                  (##string->utf8 str start end))))))))
+
+(define-prim (##utf8->string-length
+              u8vect
+              #!optional
+              (start 0)
+              (end (##u8vector-length u8vect)))
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (let loop ((i start)
+             (len 0))
+    (if (fx< i end)
+        (let ((b0 (u8vector-ref u8vect i)))
+          (cond ((fx< b0 #x80)
+                 ;; 1 byte encoding (ASCII)
+                 (loop (fx+ i 1)
+                       (fx+ len 1)))
+                ((fx< b0 #xe0)
+                 ;; 2 byte encoding or invalid encoding
+                 (loop (fx+ i 2)
+                       (fx+ len 1)))
+                ((fx< b0 #xf0)
+                 ;; 3 byte encoding or invalid encoding
+                 (loop (fx+ i 3)
+                       (fx+ len 1)))
+                (else
+                 ;; 4 byte encoding or invalid encoding
+                 (loop (fx+ i 4)
+                       (fx+ len 1)))))
+        (if (fx> i end)
+            0 ;; invalid or truncated encoding
+            len))))
+
+(define-prim (##utf8->string
+              u8vect
+              #!optional
+              (start 0)
+              (end (##u8vector-length u8vect)))
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (define (invalid-utf8)
+    (##raise-invalid-utf8-encoding-exception utf8->string u8vect start end))
+
+  (let* ((len (##utf8->string-length u8vect start end))
+         (result (make-string len)))
+    (if (fx= len (fx- end start))
+        (let loop1 ((i 0))
+          (if (fx< i len)
+              (begin
+                (string-set!
+                 result
+                 i
+                 (integer->char
+                  (u8vector-ref u8vect (fx+ start i))))
+                (loop1 (fx+ i 1)))
+              result))
+        (let loop2 ((i start)
+                    (j 0))
+          (if (fx< i end)
+              (if (fx< j len) ;; account for u8vect mutation by other thread
+                  (let ((b0 (u8vector-ref u8vect i)))
+                    (cond ((fx< b0 #x80)
+                           ;; 1 byte encoding (ASCII)
+                           (string-set!
+                            result
+                            j
+                            (integer->char b0))
+                           (loop2 (fx+ i 1)
+                                  (fx+ j 1)))
+                          ((fx< b0 #xc2)
+                           (invalid-utf8))
+                          ((fx< b0 #xe0)
+                           ;; 2 byte encoding
+                           (let* ((b1 (u8vector-ref
+                                       u8vect
+                                       (fx+ i 1)))
+                                  (n (fx+
+                                      (fxarithmetic-shift-left
+                                       (fxand b0 #x1f)
+                                       6)
+                                      (fxand b1 #x3f))))
+                             (if (and (fx= (fxand b1 #xc0)
+                                           #x80)
+                                      (fx>= n #x80))
+                                 (begin
+                                   (string-set!
+                                    result
+                                    j
+                                    (integer->char n))
+                                   (loop2 (fx+ i 2)
+                                          (fx+ j 1)))
+                                 (invalid-utf8))))
+                          ((fx< b0 #xf0)
+                           ;; 3 byte encoding
+                           (let* ((b1 (u8vector-ref
+                                       u8vect
+                                       (fx+ i 1)))
+                                  (b2 (u8vector-ref
+                                       u8vect
+                                       (fx+ i 2)))
+                                  (n (fx+
+                                      (fxarithmetic-shift-left
+                                       (fxand b0 #x0f)
+                                       12)
+                                      (fxarithmetic-shift-left
+                                       (fxand b1 #x3f)
+                                       6)
+                                      (fxand b2 #x3f))))
+                             (if (and (fx= (fxand (fxior b1
+                                                         b2)
+                                                  #xc0)
+                                           #x80)
+                                      (fx>= n #x800)
+                                      (not
+                                       (and (fx>= n #xd800)
+                                            (fx<= n #xdfff))))
+                                 (begin
+                                   (string-set!
+                                    result
+                                    j
+                                    (integer->char n))
+                                   (loop2 (fx+ i 3)
+                                          (fx+ j 1)))
+                                 (invalid-utf8))))
+                          ((fx< b0 #xf5)
+                           ;; 4 byte encoding
+                           (let* ((b1 (u8vector-ref
+                                       u8vect
+                                       (fx+ i 1)))
+                                  (b2 (u8vector-ref
+                                       u8vect
+                                       (fx+ i 2)))
+                                  (b3 (u8vector-ref
+                                       u8vect
+                                       (fx+ i 3)))
+                                  (n (fx+
+                                      (fxarithmetic-shift-left
+                                       (fxand b0 #x07)
+                                       18)
+                                      (fxarithmetic-shift-left
+                                       (fxand b1 #x3f)
+                                       12)
+                                      (fxarithmetic-shift-left
+                                       (fxand b2 #x3f)
+                                       6)
+                                      (fxand b3 #x3f))))
+                             (if (and (fx= (fxand (fxior b1
+                                                         b2
+                                                         b3)
+                                                  #xc0)
+                                           #x80)
+                                      (fx>= n #x10000)
+                                      (fx<= n #x10ffff))
+                                 (begin
+                                   (string-set!
+                                    result
+                                    j
+                                    (integer->char n))
+                                   (loop2 (fx+ i 4)
+                                          (fx+ j 1)))
+                                 (invalid-utf8))))
+                          (else
+                           (invalid-utf8))))
+                  (invalid-utf8))
+              (if (or (fx> i end)
+                      (fx< j len))
+                  (invalid-utf8)
+                  result))))))
+
+(define-prim (utf8->string
+              u8vect
+              #!optional
+              (start (macro-absent-obj))
+              (end (macro-absent-obj)))
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+  (namespace ("" utf8->string)) ;; but not utf8->string to ##utf8->string
+
+  (macro-force-vars (u8vect start end)
+    (macro-check-u8vector
+      u8vect
+      1
+      (utf8->string u8vect start end)
+      (if (eq? start (macro-absent-obj))
+          (##utf8->string u8vect)
+          (macro-check-index-range-incl
+            start
+            2
+            0
+            (u8vector-length u8vect)
+            (utf8->string u8vect start end)
+            (if (eq? end (macro-absent-obj))
+                (##utf8->string u8vect start)
+                (macro-check-index-range-incl
+                  end
+                  3
+                  start
+                  (u8vector-length u8vect)
+                  (utf8->string u8vect start end)
+                  (##utf8->string u8vect start end))))))))
+
+;;;============================================================================
+
+#+end_src
+
+*** ~min/num/qrm.scm~
+#+begin_src scheme :tangle ../gambit/min/num/qrm.scm
+;; quotient, remainder, modulo
+
+(define-prim (##divide x y kind)
+
+  ;; kind = 0  : floor-remainder
+  ;; kind = 1  : floor-quotient
+  ;; kind = 2  : floor/
+  ;; kind = 4  : truncate-remainder
+  ;; kind = 5  : truncate-quotient
+  ;; kind = 6  : truncate/
+  ;; kind = 8  : modulo
+  ;; kind = 12 : remainder
+  ;; kind = 13 : quotient
+
+  (define (prim)
+    (cond ((##fx= kind 0)  floor-remainder)
+          ((##fx= kind 1)  floor-quotient)
+          ((##fx= kind 2)  floor/)
+          ((##fx= kind 4)  truncate-remainder)
+          ((##fx= kind 5)  truncate-quotient)
+          ((##fx= kind 6)  truncate/)
+          ((##fx= kind 12) remainder)
+          ((##fx= kind 13) quotient)
+          (else            modulo))) ;; kind = 8
+
+  (define (type-error-on-x)
+    (##fail-check-integer 1 (prim) x y))
+
+  (define (type-error-on-y)
+    (##fail-check-integer 2 (prim) x y))
+
+  (define (divide-by-zero-error)
+    (##raise-divide-by-zero-exception (prim) x y))
+
+  (define (fixnum-fixnum-case x y)
+    (if (##fx= y -1) ;; needed because (quotient ##min-fixnum -1) is a bignum
+
+        (let ((k (##fxand kind 3)))
+          (if (##fx= k 0)
+              0 ;; floor-remainder and truncate-remainder
+              (if (##fx= k 1)
+                  (##negate x) ;; floor-quotient and truncate-quotient
+                  (##values (##negate x) 0)))) ;; floor/ and truncate/
+
+        (if (##fx= (##fxand kind 4) 0)
+
+            ;; floor variants
+            (let ((k (##fxand kind 3)))
+              (if (##fx= k 0)
+                  (##fxmodulo x y) ;; floor-remainder
+                  (let* ((q (##fxquotient x y))
+                         (m (##fxmodulo x y)))
+                    (if (or (##eqv? m 0)
+                            (##eq? (##fxnegative? x) (##fxnegative? y)))
+                        (if (##fx= k 1)
+                            q ;; floor-quotient
+                            (##values q ;; floor/
+                                      m))
+                        (if (##fx= k 1)
+                            (##fx- q 1) ;; floor-quotient
+                            (##values (##fx- q 1) ;; floor/
+                                      m))))))
+
+            ;; truncate variants
+            (let ((k (##fxand kind 3)))
+              (if (##fx= k 0)
+                  (##fxremainder x y) ;; truncate-remainder
+                  (if (##fx= k 1)
+                      (##fxquotient x y) ;; truncate-quotient
+                      (##values (##fxquotient x y) ;; truncate/
+                                (##fxremainder x y))))))))
+
+  (define (exact-case x y convert-to-inexact?)
+
+    (define (conv n)
+      (if convert-to-inexact? (##exact->inexact n) n))
+
+    (let* ((qr (##exact-int.div x
+                                y
+                                (##fx> (##fxand kind 3) 0) ;; need-quotient?
+                                #t                         ;; keep-dividend?
+                                ))
+           (q (macro-qr-q qr))
+           (r (macro-qr-r qr)))
+
+      (if (and (##fx= (##fxand kind 4) 0)
+               (##not (##eqv? r 0))
+               (##not (##eq? (##negative? x) (##negative? y))))
+
+          ;; floor variants
+          (let ((k (##fxand kind 3)))
+            (if (##fx= k 0)
+                (conv (##+ r y)) ;; floor-remainder
+                (if (##fx= k 1)
+                    (conv (##- q 1)) ;; floor-quotient
+                    (##values (conv (##- q 1)) ;; floor/
+                              (conv (##+ r y))))))
+
+          ;; truncate variants
+          (let ((k (##fxand kind 3)))
+            (if (##fx= k 0)
+                (conv r) ;; truncate-remainder
+                (if (##fx= k 1)
+                    (conv q) ;; truncate-quotient
+                    (##values (conv q) ;; truncate/
+                              (conv r))))))))
+
+  (define (inexact-case x y)
+    (let ((exact-y (##inexact->exact y)))
+      (if (##eqv? exact-y 0)
+          (divide-by-zero-error)
+          (exact-case (##inexact->exact x) exact-y #t))))
+
+  (macro-number-dispatch y (type-error-on-y)
+
+    (macro-number-dispatch x (type-error-on-x) ;; y = fixnum
+      (cond ((##fx= y 0)
+             (divide-by-zero-error))
+            (else
+             (fixnum-fixnum-case x y)))
+      (cond ((##fx= y 0)
+             (divide-by-zero-error))
+            (else
+             (exact-case x y #f)))
+      (type-error-on-x)
+      (if (macro-flonum-int? x)
+          (inexact-case x y)
+          (type-error-on-x))
+      (if (macro-cpxnum-int? x)
+          (inexact-case x y)
+          (type-error-on-x)))
+
+    (macro-number-dispatch x (type-error-on-x) ;; y = bignum
+      (exact-case x y #f)
+      (exact-case x y #f)
+      (type-error-on-x)
+      (if (macro-flonum-int? x)
+          (inexact-case x y)
+          (type-error-on-x))
+      (if (macro-cpxnum-int? x)
+          (inexact-case x y)
+          (type-error-on-x)))
+
+    (type-error-on-y) ;; y = ratnum
+
+    (macro-number-dispatch x (type-error-on-x) ;; y = flonum
+      (if (macro-flonum-int? y)
+          (inexact-case x y)
+          (type-error-on-y))
+      (if (macro-flonum-int? y)
+          (inexact-case x y)
+          (type-error-on-y))
+      (type-error-on-x)
+      (if (macro-flonum-int? x)
+          (if (macro-flonum-int? y)
+              (inexact-case x y)
+              (type-error-on-y))
+          (type-error-on-x))
+      (if (macro-cpxnum-int? x)
+          (if (macro-flonum-int? y)
+              (inexact-case x y)
+              (type-error-on-y))
+          (type-error-on-x)))
+
+    (if (macro-cpxnum-int? y) ;; y = cpxnum
+        (macro-number-dispatch x (type-error-on-x)
+          (inexact-case x y)
+          (inexact-case x y)
+          (type-error-on-x)
+          (if (macro-flonum-int? x)
+              (inexact-case x y)
+              (type-error-on-x))
+          (if (macro-cpxnum-int? x)
+              (inexact-case x y)
+              (type-error-on-x)))
+        (type-error-on-y))))
+
+(define-prim (##floor-remainder x y)
+  (##divide x y 0))
+
+(define-prim (floor-remainder x y)
+  (macro-force-vars (x y)
+    (##divide x y 0)))
+
+(define-prim (##floor-quotient x y)
+  (##divide x y 1))
+
+(define-prim (floor-quotient x y)
+  (macro-force-vars (x y)
+    (##divide x y 1)))
+
+(define-prim (##floor/ x y)
+  (##divide x y 2))
+
+(define-prim (floor/ x y)
+  (macro-force-vars (x y)
+    (##divide x y 2)))
+
+(define-prim (##truncate-remainder x y)
+  (##divide x y 4))
+
+(define-prim (truncate-remainder x y)
+  (macro-force-vars (x y)
+    (##divide x y 4)))
+
+(define-prim (##truncate-quotient x y)
+  (##divide x y 5))
+
+(define-prim (truncate-quotient x y)
+  (macro-force-vars (x y)
+    (##divide x y 5)))
+
+(define-prim (##truncate/ x y)
+  (##divide x y 6))
+
+(define-prim (truncate/ x y)
+  (macro-force-vars (x y)
+    (##divide x y 6)))
+
+(define-prim (##remainder x y)
+  (##divide x y 12))
+
+(define-prim (remainder x y)
+  (macro-force-vars (x y)
+    (##divide x y 12)))
+
+(define-prim (##quotient x y)
+  (##divide x y 13))
+
+(define-prim (quotient x y)
+  (macro-force-vars (x y)
+    (##divide x y 13)))
+
+(define-prim (##modulo x y)
+  (##divide x y 8))
+
+(define-prim (modulo x y)
+  (macro-force-vars (x y)
+    (##divide x y 8)))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+#+end_src
+*** ~min/num/gcdlcm.scm~
+
+#+begin_src scheme :tangle ../gambit/min/num/gcdlcm.scm :mkdirp yes
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; gcd, lcm
+
+(define-prim (##gcd2 x y)
+
+  (##define-macro (type-error-on-x) `'(1))
+  (##define-macro (type-error-on-y) `'(2))
+
+  (define (fast-gcd u v)
+
+    ;; See the paper "Fast Reduction and Composition of Binary
+    ;; Quadratic Forms" by Arnold Schoenhage.  His algorithm and proof
+    ;; are derived from, and basically the same for, his Controlled
+    ;; Euclidean Descent algorithm for gcd, which he has never
+    ;; published.  This algorithm has complexity log N times a
+    ;; constant times the complexity of a multiplication of the same
+    ;; size.  We don't use it until we get to about 6800 bits.  Note
+    ;; that this is the same place that we start using FFT
+    ;; multiplication and fast division with Newton's method for
+    ;; finding inverses.
+
+    ;; Niels Mo"ller has written two papers about an improved version
+    ;; of this algorithm.
+
+    ;; assumes u and v are nonnegative exact ints
+
+    (define (make-gcd-matrix A_11 A_12
+                             A_21 A_22)
+      (##vector A_11 A_12
+                A_21 A_22))
+
+    (define (gcd-matrix_11 A)
+      (##vector-ref A 0))
+
+    (define (gcd-matrix_12 A)
+      (##vector-ref A 1))
+
+    (define (gcd-matrix_21 A)
+      (##vector-ref A 2))
+
+    (define (gcd-matrix_22 A)
+      (##vector-ref A 3))
+
+    (define (make-gcd-vector v_1 v_2)
+      (##vector v_1 v_2))
+
+    (define (gcd-vector_1 v)
+      (##vector-ref v 0))
+
+    (define (gcd-vector_2 v)
+      (##vector-ref v 1))
+
+    (define gcd-matrix-identity '#(1 0
+                                   0 1))
+
+    (define (gcd-matrix-multiply A B)
+      (cond ((##eq? A gcd-matrix-identity)
+             B)
+            ((##eq? B gcd-matrix-identity)
+             A)
+            (else
+             (let ((A_11 (gcd-matrix_11 A)) (A_12 (gcd-matrix_12 A))
+                   (A_21 (gcd-matrix_21 A)) (A_22 (gcd-matrix_22 A))
+                   (B_11 (gcd-matrix_11 B)) (B_12 (gcd-matrix_12 B))
+                   (B_21 (gcd-matrix_21 B)) (B_22 (gcd-matrix_22 B)))
+               (make-gcd-matrix (##+ (##* A_11 B_11)
+                                     (##* A_12 B_21))
+                                (##+ (##* A_11 B_12)
+                                     (##* A_12 B_22))
+                                (##+ (##* A_21 B_11)
+                                     (##* A_22 B_21))
+                                (##+ (##* A_21 B_12)
+                                     (##* A_22 B_22)))))))
+
+    (define (gcd-matrix-multiply-strassen A B)
+      ;; from http://mathworld.wolfram.com/StrassenFormulas.html
+      (cond ((##eq? A gcd-matrix-identity)
+             B)
+            ((##eq? B gcd-matrix-identity)
+             A)
+            (else
+             (let ((A_11 (gcd-matrix_11 A)) (A_12 (gcd-matrix_12 A))
+                   (A_21 (gcd-matrix_21 A)) (A_22 (gcd-matrix_22 A))
+                   (B_11 (gcd-matrix_11 B)) (B_12 (gcd-matrix_12 B))
+                   (B_21 (gcd-matrix_21 B)) (B_22 (gcd-matrix_22 B)))
+               (let ((Q_1 (##* (##+ A_11 A_22) (##+ B_11 B_22)))
+                     (Q_2 (##* (##+ A_21 A_22) B_11))
+                     (Q_3 (##* A_11 (##- B_12 B_22)))
+                     (Q_4 (##* A_22 (##- B_21 B_11)))
+                     (Q_5 (##* (##+ A_11 A_12) B_22))
+                     (Q_6 (##* (##- A_21 A_11) (##+ B_11 B_12)))
+                     (Q_7 (##* (##- A_12 A_22) (##+ B_21 B_22))))
+                 (make-gcd-matrix (##+ (##+ Q_1 Q_4) (##- Q_7 Q_5))
+                                  (##+ Q_3 Q_5)
+                                  (##+ Q_2 Q_4)
+                                  (##+ (##+ Q_1 Q_3) (##- Q_6 Q_2))))))))
+
+    (define (gcd-matrix-solve A y)
+      (let ((y_1 (gcd-vector_1 y))
+            (y_2 (gcd-vector_2 y)))
+        (make-gcd-vector (##- (##* y_1 (gcd-matrix_22 A))
+                              (##* y_2 (gcd-matrix_12 A)))
+                         (##- (##* y_2 (gcd-matrix_11 A))
+                              (##* y_1 (gcd-matrix_21 A))))))
+
+    (define (x>=2^n x n)
+      (##fx< n (##integer-length x)))
+
+    (define (determined-minimal? u v s)
+      ;; assumes  2^s <= u , v; s>= 0 fixnum
+      ;; returns #t if we can determine that |u-v|<2^s
+      ;; at least one of u and v is a bignum
+      (let ((u (if (##fixnum? u) (##fixnum->bignum u) u))
+            (v (if (##fixnum? v) (##fixnum->bignum v) v)))
+        (let ((u-length (##bignum.mdigit-length u)))
+          (and (##fx= u-length (##bignum.mdigit-length v))
+               (let loop ((i (##fx- u-length 1)))
+                 (let ((v-digit (##bignum.mdigit-ref v i))
+                       (u-digit (##bignum.mdigit-ref u i)))
+                   (if (and (##fxzero? u-digit)
+                            (##fxzero? v-digit))
+                       (loop (##fx- i 1))
+                       (and (##fx= (##fxquotient s ##bignum.mdigit-width)
+                                   i)
+                            (##fx< (##fxmax (##fx- u-digit v-digit)
+                                            (##fx- v-digit u-digit))
+                                   (##fxarithmetic-shift-left
+                                    1
+                                    (##fxremainder s ##bignum.mdigit-width)))))))))))
+
+    (define (gcd-small-step cont M u v s)
+      ;;  u, v >= 2^s
+      ;; M is the matrix product of the partial sums of
+      ;; the continued fraction representation of a/b so far
+      ;; returns updated M, u, v, and a truth value
+      ;;  u, v >= 2^s and
+      ;; if last return value is #t, we know that
+      ;; (- (max u v) (min u v)) < 2^s, i.e, u, v are minimal above 2^s
+
+      (define (gcd-matrix-multiply-low M q)
+        (let ((M_11 (gcd-matrix_11 M))
+              (M_12 (gcd-matrix_12 M))
+              (M_21 (gcd-matrix_21 M))
+              (M_22 (gcd-matrix_22 M)))
+          (make-gcd-matrix (##+ M_11 (##* q M_12))  M_12
+                           (##+ M_21 (##* q M_22))  M_22)))
+
+      (define (gcd-matrix-multiply-high M q)
+        (let ((M_11 (gcd-matrix_11 M))
+              (M_12 (gcd-matrix_12 M))
+              (M_21 (gcd-matrix_21 M))
+              (M_22 (gcd-matrix_22 M)))
+          (make-gcd-matrix M_11  (##+ (##* q M_11) M_12)
+                           M_21  (##+ (##* q M_21) M_22))))
+
+      (if (or (##bignum? u)
+              (##bignum? v))
+
+          ;; if u and v are nearly equal bignums, the two ##<
+          ;; following this condition could take O(N) time to compute.
+          ;; When this happens, however, it will be likely that
+          ;; determined-minimal? will return true.
+
+          (cond ((determined-minimal? u v s)
+                 (cont M
+                       u
+                       v
+                       #t))
+                ((##< u v)
+                 (let* ((qr (##exact-int.div v u))
+                        (q (macro-qr-q qr))
+                        (r (macro-qr-r qr)))
+                   (cond ((x>=2^n r s)
+                          (cont (gcd-matrix-multiply-low M q)
+                                u
+                                r
+                                #f))
+                         ((##eqv? q 1)
+                          (cont M
+                                u
+                                v
+                                #t))
+                         (else
+                          (cont (gcd-matrix-multiply-low M (##- q 1))
+                                u
+                                (##+ r u)
+                                #t)))))
+                ((##< v u)
+                 (let* ((qr (##exact-int.div u v))
+                        (q (macro-qr-q qr))
+                        (r (macro-qr-r qr)))
+                   (cond ((x>=2^n r s)
+                          (cont (gcd-matrix-multiply-high M q)
+                                r
+                                v
+                                #f))
+                         ((##eqv? q 1)
+                          (cont M
+                                u
+                                v
+                                #t))
+                         (else
+                          (cont (gcd-matrix-multiply-high M (##- q 1))
+                                (##+ r v)
+                                v
+                                #t)))))
+                (else
+                 (cont M
+                       u
+                       v
+                       #t)))
+          ;; here u and v are fixnums, so 2^s, which is <= u and v, is
+          ;; also a fixnum
+          (let ((two^s (##fxarithmetic-shift-left 1 s)))
+            (if (##fx< u v)
+                (if (##fx< (##fx- v u) two^s)
+                    (cont M
+                          u
+                          v
+                          #t)
+                    (let ((r (##fxremainder v u))
+                          (q (##fxquotient  v u)))
+                      (if (##fx>= r two^s)
+                          (cont (gcd-matrix-multiply-low M q)
+                                u
+                                r
+                                #f)
+                          ;; the case when q is one and the remainder is < two^s
+                          ;; is covered in the first test
+                          (cont (gcd-matrix-multiply-low M (##fx- q 1))
+                                u
+                                (##fx+ r u)
+                                #t))))
+                ;; here u >= v, but the case u = v is covered by the first test
+                (if (##fx< (##fx- u v) two^s)
+                    (cont M
+                          u
+                          v
+                          #t)
+                    (let ((r (##fxremainder u v))
+                          (q (##fxquotient  u v)))
+                      (if (##fx>= r two^s)
+                          (cont (gcd-matrix-multiply-high M q)
+                                r
+                                v
+                                #f)
+                          ;; the case when q is one and the remainder is < two^s
+                          ;; is covered in the first test
+                          (cont (gcd-matrix-multiply-high M (##fx- q 1))
+                                (##fx+ r v)
+                                v
+                                #t))))))))
+
+    (define (gcd-middle-step cont a b h m-prime cont-needs-M?)
+      ((lambda (cont)
+         (if (and (x>=2^n a h)
+                  (x>=2^n b h))
+             (MR cont a b h cont-needs-M?)
+             (cont gcd-matrix-identity a b)))
+       (lambda (M x y)
+         (let loop ((M M)
+                    (x x)
+                    (y y))
+           (if (or (x>=2^n x h)
+                   (x>=2^n y h))
+               ((lambda (cont) (gcd-small-step cont M x y m-prime))
+                (lambda (M x y minimal?)
+                  (if minimal?
+                      (cont M x y)
+                      (loop M x y))))
+               ((lambda (cont) (MR cont x y m-prime cont-needs-M?))
+                (lambda (M-prime alpha beta)
+                  (cont (if cont-needs-M?
+                            (if (##fx> (##fx- h m-prime) 1024)
+                                ;; here we trade off 1 multiplication
+                                ;; for 21 additions
+                                (gcd-matrix-multiply-strassen M M-prime)
+                                (gcd-matrix-multiply          M M-prime))
+                            gcd-matrix-identity)
+                        alpha
+                        beta))))))))
+
+    (define (MR cont a b m cont-needs-M?)
+      ((lambda (cont)
+         (if (and (x>=2^n a (##fx+ m 2))
+                  (x>=2^n b (##fx+ m 2)))
+             (let ((n (##fx- (##fxmax (##integer-length a)
+                                      (##integer-length b))
+                             m)))
+               ((lambda (cont)
+                  (if (##fx<= m n)
+                      (cont m 0)
+                      (cont n (##fx- (##fx+ m 1) n))))
+                (lambda (m-prime p)
+                  (let ((h (##fx+ m-prime (##fxquotient n 2))))
+                    (if (##fx< 0 p)
+                        (let ((a   (##arithmetic-shift a (##fx- p)))
+                              (b   (##arithmetic-shift b (##fx- p)))
+                              (a_0 (##extract-bit-field p 0 a))
+                              (b_0 (##extract-bit-field p 0 b)))
+                          ((lambda (cont)
+                             (gcd-middle-step cont a b h m-prime #t))
+                           (lambda (M alpha beta)
+                             (let ((M-inverse-v_0 (gcd-matrix-solve M (make-gcd-vector a_0 b_0))))
+                               (cont (if cont-needs-M? M gcd-matrix-identity)
+                                     (##+ (##arithmetic-shift alpha p)
+                                          (gcd-vector_1 M-inverse-v_0))
+                                     (##+ (##arithmetic-shift beta p)
+                                          (gcd-vector_2 M-inverse-v_0)))))))
+                        (gcd-middle-step cont a b h m-prime cont-needs-M?))))))
+             (cont gcd-matrix-identity
+                   a
+                   b)))
+       (lambda (M alpha beta)
+         (let loop ((M M)
+                    (alpha alpha)
+                    (beta beta)
+                    (minimal? #f))
+           (if minimal?
+               (cont M alpha beta)
+               (gcd-small-step loop M alpha beta m))))))
+
+    ((lambda (cont)
+       (if (and (use-fast-bignum-algorithms)
+                (##bignum? u)
+                (##bignum? v)
+                (x>=2^n u ##bignum.fast-gcd-size)
+                (x>=2^n v ##bignum.fast-gcd-size))
+           (MR cont u v ##bignum.fast-gcd-size #f)
+           (cont 0 u v)))
+     (lambda (M a b)
+       (general-base a b))))
+
+  (define (general-base a b)
+    (if (##eqv? b 0)
+        a
+        (let ((r (macro-qr-r (##exact-int.div a  ;; calculate (remainder a b)
+                                              b
+                                              #f ;; need-quotient?
+                                              #f ;; keep-dividend?
+                                              ))))
+          (if (##fixnum? b)
+              (fixnum-base b r)
+              (general-base b r)))))
+
+  (define (fixnum-base a b)
+    (##declare (not interrupts-enabled))
+    (if (##eqv? b 0)
+        a
+        (let ((a b)
+              (b (##fxremainder a b)))
+          (if (##eqv? b 0)
+              a
+              (fixnum-base b (##fxremainder a b))))))
+
+  (define (exact-gcd x y)
+    ;; always returns an exact result, even with inexact arguments.
+    (let ((x (cond ((##inexact? x)
+                    (##inexact->exact (##flabs x)))
+                   ((##negative? x)
+                    (##negate x))
+                   ((##bignum? x)
+                    (##bignum.copy x))
+                   (else ;; nonnegative fixnum
+                    x)))
+          (y (cond ((##inexact? y)
+                    (##inexact->exact (##flabs y)))
+                   ((##negative? y)
+                    (##negate y))
+                   ((##bignum? y)
+                    (##bignum.copy y))
+                   (else ;; nonnegative fixnum
+                    y))))
+      ;; now x and y are newly allocated, so we can overwrite them if
+      ;; necessary in general-base
+      (cond ((##eqv? x 0)
+             y)
+            ((##eqv? y 0)
+             x)
+            ((##fixnum? x)
+             (if (##fixnum? y)
+                 (fixnum-base x y)
+                 (fixnum-base x (##remainder y x))))
+            ((##fixnum? y)
+             (fixnum-base y (##remainder x y)))
+            (else
+             (let* ((first-x-bit
+                     (##first-bit-set x))
+                    (first-y-bit
+                     (##first-bit-set y))
+                    (shift-x?
+                     (##fx> (##fx* 2 first-x-bit) (##integer-length x)))
+                    (shift-y?
+                     (##fx> (##fx* 2 first-y-bit) (##integer-length y)))
+                    (x
+                     (if shift-x?
+                         (##arithmetic-shift x (##fx- first-x-bit))
+                         x))
+                    (y
+                     (if shift-y?
+                         (##arithmetic-shift y (##fx- first-y-bit))
+                         y)))
+               (if (or shift-x? shift-y?)
+                   ;; we've shifted out all the powers of two in at
+                   ;; least one argument, so we need to put them back
+                   ;; in the gcd.
+                   (##arithmetic-shift (##gcd x y)
+                                       (##fxmin first-x-bit first-y-bit))
+                   (fast-gcd x y)))))))
+
+  (cond ((##not (##integer? x))
+         (type-error-on-x))
+        ((##not (##integer? y))
+         (type-error-on-y))
+        ((##eq? x y)
+         (##abs x))
+        (else
+         (if (and (##exact? x) (##exact? y))
+             (exact-gcd x y)
+             (##exact->inexact (exact-gcd x y))))))
+
+(define-prim-nary (##gcd x y)
+  0
+  (##abs x)
+  (##gcd2 x y)
+  macro-force-vars
+  macro-no-check)
+
+(define-prim-nary (gcd x y)
+  0
+  (if (##integer? x) (##abs x) '(1))
+  (##gcd2 x y)
+  macro-force-vars
+  macro-no-check
+  (##pair? ##fail-check-integer))
+
+(define-prim (##lcm2 x y)
+
+  (##define-macro (type-error-on-x) `'(1))
+  (##define-macro (type-error-on-y) `'(2))
+
+  (define (exact-lcm x y)
+    (if (or (##eqv? x 0) (##eqv? y 0))
+        0
+        (##abs (##* (##quotient x (##gcd x y))
+                    y))))
+
+  (define (inexact-lcm x y)
+    (##exact->inexact
+     (exact-lcm (##inexact->exact x)
+                (##inexact->exact y))))
+
+  (cond ((##not (##integer? x))
+         (type-error-on-x))
+        ((##not (##integer? y))
+         (type-error-on-y))
+        (else
+         (if (and (##exact? x) (##exact? y))
+             (exact-lcm x y)
+             (inexact-lcm x y)))))
+
+(define-prim-nary (##lcm x y)
+  1
+  (##abs x)
+  (##lcm2 x y)
+  macro-force-vars
+  macro-no-check)
+
+(define-prim-nary (lcm x y)
+  1
+  (if (##integer? x) (##abs x) '(1))
+  (##lcm2 x y)
+  macro-force-vars
+  macro-no-check
+  (##pair? ##fail-check-integer))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+#+end_src
+*** ~gxjs-minlib~
+:PROPERTIES:
+:CUSTOM_ID: minLib
+:END:
+#+begin_src scheme :tangle ../gambit/gxjs-minlib.scm
+(namespace (""))
+(##declare
+  (multilisp)
+  (extended-bindings)
+  (not safe)
+  (block)
+  (inlining-limit 134)
+  (not run-time-bindings)
+)
+
+
+
+;;;----------------------------------------------------------------------------
+
+;;; Apply.
+
+(define (##apply proc arg1 . rest)
+  (if (##pair? rest)
+
+    (let loop ((prev arg1) (lst rest))
+      (let ((temp (##car lst)))
+        (##set-car! lst prev)
+        (let ((tail (##cdr lst)))
+          (if (##pair? tail)
+            (loop temp tail)
+            (begin
+              (##set-cdr! lst temp)
+              (##apply proc rest))))))
+
+    (##apply proc arg1)))
+
+;;;----------------------------------------------------------------------------
+(##define-macro (##raise-range-exception . args)
+  `(##inline-host-expression "(() => {
+      const _err = (@1@);
+      const _num = _err.car; console.error('range execption:', _num, 'is out of', _err);
+  })()" '(,@args)))
+(##define-macro (##raise-type-exception . args)
+  `(##inline-host-expression "console.error('type execption:', @1@);" '(,@args)))
+;;;----------------------------------------------------------------------------
+
+
+
+;; when and unless
+(##define-macro (when condition . body)
+  `(if ,condition (begin ,@body) #!void))
+(##define-macro (unless condition . body)
+  `(if ,condition #!void (begin ,@body)))
+
+;;; Common modules of the runtime system.
+(##define-macro (incl filename)
+  `(##declare-scope
+    (##macro-scope
+     (##namespace-scope
+      (##include ,filename)))))
+
+
+(incl "min/equality.scm")
+;;(incl "min/cte.scm")
+;;(incl "min/eval.scm")
+(incl "min/list.scm")
+;; (incl "min/error.scm")
+(incl "min/vector.scm")
+(incl "min/structure.scm")
+(incl "min/symkey.scm")
+(incl "min/char.scm")
+(incl "min/string.scm")
+(incl "min/nums.scm")
+(incl "min/num/qrm.scm")
+;(incl "min/num/gcdlcm.scm")
+(incl "min/thread.scm")
+(incl "min/values.scm")
+(incl "min/exception.scm")
+(incl "min/module-registry.scm")
+(incl "min/host2scm2host.scm")
+(##inline-host-declaration
+ "g_module_registry_init([new G_ModLinkInfo(\"gxjs-execute\",0),new G_ModLinkInfo(\"gxjs-minlib\",1)]);")
+#;(##inline-host-statement "console.error(@1@)"
+                         (##with-exception-handler (lambda _ 42) (lambda _ (raise 'an-error))))
+#+end_src
+
+
+** Execute
+
+#+begin_src scheme :tangle ../gambit/min/execute.scm
+(##inline-host-declaration "console.log('startup file loaded');")
+
+
+;(##inline-host-statement "alert('Startup file inited!!');console.log('asd', (@1@));" +)
+(define (##init-gambit-program)
+  (declare (extended-bindings) (not safe))
+
+  (define (##init-gambit-module mod)
+  (let ((init (##vector-ref mod 4)))
+    (if (not (##procedure? init)) (##inline-host-statement "alert('Cannot find init function in ' + g_module_name(@1@)); " mod)
+        (init))))
+  ;(##inline-host-statement "console.error('prog',g_glo['##program-descr'] )")
+    (let ((mods (##vector-ref ##program-descr 0)))
+      (let loop ((i 1)) ;; start at module after the current one
+        (if (##fx< i (##vector-length mods))
+            (let ((mod (##vector-ref mods i)))
+              (##init-gambit-module mod) ;; call module's init procedure
+              (loop (##fx+ i 1)))))))
+
+(##init-gambit-program)
+
+(##startup-processor!)
+
+;; when and unless
+(##define-macro (when condition . body)
+  `(if ,condition (begin ,@body) #!void))
+(##define-macro (unless condition . body)
+  `(if ,condition #!void (begin ,@body)))
+
+(##inline-host-statement "console.log('made it here!', (@1@))" (lambda () 1))
+
+#+end_src
+
+* Build Script
+
+#+begin_src shell :tangle ../build.sh  :shebang "#!/usr/bin/env bash" :noweb yes
+_dir=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
+echo dir: $_dir; cd $_dir;
+
+make_gxjs () {
+    gsc -target js -o gxjs-execute.js gambit/min/execute.scm
+
+
+    echo Compile a link file from our minlib to the _gambit.js runtime.
+    echo This makes sure that all the 'g_*' functions get included it seems.
+
+    gsc -target js -o gxjs-link.js -link gambit/gxjs-minlib.js
+
+# echo replace the module init with the other one for our runtime.
+
+# sed -i "s/^g_module_registry_init(.*/$_hello_mod_init/" gxjs-link.js
+
+echo Compile the minlib
+
+gsc -target js -o gxjs-minlib.js -prelude '(include "~~lib/_gambit#.scm")' gambit/gxjs-minlib.scm
+
+_make_exec='cat gxjs-link.js gxjs-minlib.js gxjs-execute.js > gxjs.js';
+echo Making exectuable : $_make_exec; eval $_make_exec;
+
+echo Building r7rs-test
+gsc -target js -o r7rs-test.js test/r7rs-test.scm ; mv r7rs-test.js test/
+
+echo 'Done!!'
+}
+du gxjs.js  ; make_gxjs ; du gxjs.js ; yarn run webpack
+#+end_src

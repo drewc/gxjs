@@ -1,0 +1,30 @@
+#+TITLE: Split Up For A New Beginning
+#+DATE:<2020-12-19 Sat 09:00>--<2020-12-27 Sun>
+
+I've decided to split out the *Gerbil* runtime, *GxJS* into parts more usable to
+*JavaScript* developers and more useful to the *Gerbil* and *Gambit*
+communities.
+
+For the first step I went through [[file:~/me/src/gxjs/doc/R7RS-in-js.org::Here goes.][R7RS]], in specfic ~(scheme base)~, and cribbed
+what I could.
+
+To pack it up for the web, *webpack* is used. That allows us to output things
+the browser likes. Have a look here: [[file:~/me/src/gxjs/doc/webpack.org][I'm sure there will be more.]]
+
+The real reason behind this is that the *Gambit* intepreter and compiler take up
+a lot of disk space when translated to ~js~. While that's not really a problem,
+webapps prefer a minimal approach.
+
+I'm currently missing ports and continutations, but this number tells me this
+stage is done and it's time to move on. Perhaps others will see *420* and burn
+one with me.
+
+#+begin_src shell
+$ du gxjs.js
+4420    gxjs.js
+#+end_src
+
+To test it there's a simple [[file:~/me/src/gxjs/test/test.org][index.html]] which simply loads and tests at the
+console. It's a decent first step.
+
+Commit everything! Yay!
