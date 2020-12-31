@@ -26,8 +26,63 @@ Assets: main.js (3.03 MiB)
          : 4420    gxjs.js
      2) No vectors?
          : 3612    gxjs.js
-     3) My new JS vectors and bytevectors
+     3) My new JS vectors and bytevectors for base
          : 3648    gxjs.js
          : (2.59 MiB) for main.js
 
-         Almost 1/2 mb!
+         Almost 1/2 mb saved off the minified!
+
+   - [X] Strings
+
+     1) full strings
+         : 3648    gxjs.js
+
+     2) No Strings?
+        : 2796    gxjs.js
+
+     3) New "base" strings
+        : 2848    gxjs.js
+        : main (2.06 MiB)
+
+        This broke the ~equal?~ for lists of characters it seems. That's not a
+        bad thing as there's a lot of code there my tests need not.
+
+   - [X] Equality
+
+     Fixing chars and commenting out what my tests do not test.
+
+     1) before
+        : 2848    gxjs.js
+
+     2) Without anything in [[file:~/me/src/gxjs/doc/R7RS-in-js.org::#minEquality][~min/equality.scm~]]
+        : 2572    gxjs.js
+
+     3) after a small change to fix and comment, re-add equality.
+        : 2688    gxjs.js
+        : main.js 1.99 MiB
+
+          #+begin_src scheme
+     ((##char? obj1)
+      (and (##char? obj2)
+           (##inline-host-expression "(@1@).code === (@2@).code" obj1 obj2)))
+          #+end_src
+
+   - [X] Chars
+
+     Characters aslo take up a lot of space.
+
+     1) before
+       : 2688    gxjs.js
+       : main.js 1.99 MiB
+
+     2) Remove all chars(wow!)
+       : 1832    gxjs.js
+       : main.js (1.22 MiB)
+
+     3) Add in what passes tests.
+
+         I have no idea why, but I only needed to add char->integer and
+         integer->char and it all works! [[file:~/me/src/gxjs/doc/primitive.org::#primChr][Characters]].
+
+              : 1836    gxjs.js
+             : main.js (1.22 MiB)

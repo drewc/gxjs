@@ -12,3 +12,7 @@
 (define-js-prim-op ##- "-" 0) (define-prim - ##-)
 (define-js-prim-op ##* "*" 1) (define-prim * ##*)
 (define-js-prim-op ##/ "/" 1) (define-prim / ##/)
+
+(define-prim (##min . args)
+  (##inline-host-expression "((ns) => Math.min(...ns))(@1@);" (##list->vector args)))
+(define-prim min ##min)

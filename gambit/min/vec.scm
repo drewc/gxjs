@@ -132,7 +132,7 @@
 (define (typed-vec->vec x) (##inline-host-expression "(@1@).elems" x))
 
 (##define-macro (define-vec-construct name other-name maker)
-  `(begin (define-prim (,name . xs) (vec-maker  "g_make_u8vector"(##list->vector xs)))
+  `(begin (define-prim (,name . xs) (vec-maker "g_make_u8vector" (##list->vector xs)))
           (define-prim ,other-name ,name)))
 
 (define-vec-construct ##u8vector u8vector "g_make_u8vector")
