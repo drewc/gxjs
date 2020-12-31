@@ -18,6 +18,7 @@
 
 (define (test-r7rs)
   (test> "1 + 1 + 1 using + =" (+ 1 1 1) = 3)
+  (test> "(+ 1) using + =" (+ 1) = 1)
   (test> "1 + 1 + 1.5 using + =" (+ 1 1 1.5) = 3.5)
   (test> "2 x 2 x 2 using * =" (* 2 2 2) = 8)
   (test> "1 / 2 using / =" (/ 1 2) = 0.5)
@@ -51,7 +52,8 @@
                              (_ (bytevector-copy! u 1 (bytevector 4 2 0) 1 2))
                              (l (bytevector-length u))
                              (four (bytevector-u8-ref bv 0))
-                             (_ (bytevector-u8-set! v 0 42)))
+                             (_ (bytevector-u8-set! v 0 42))
+                             )
 
                         (list
                          (bytevector? bv)
@@ -60,8 +62,11 @@
                          (equal? a b)
                          (equal? u bv)
                          (= 2 l)
-                         (= 4 four)))
-         equal? '(#t #t #t #t #t #t #t))
+                         (= 4 four)
+                         ))
+         equal? '(#t #t #t #t #t #t #t
+
+                     ))
 
 
   (test> "caar ((42))" (caar '((42))) = 42)
@@ -332,47 +337,50 @@
 
   (test> "vector"
          (let* ((v (vector 42 4 2))
-               (lst (vector->list v))
-               (sv (vector #\4 #\2))
-               (str (vector->string sv))
-               (lststr (vector-append v sv))
-               (vc (vector-copy lststr 3 4))
-               (u (vector 4 0))
-               (_ (vector-copy! u 1 (vector 4 2 0) 1 2))
-               (fv (vector 0 4 0))
-               (_ (vector-fill! fv 2 2 3))
-               (vl (vector-length (vector 0 1 2)))
-               (vm (vector-map (lambda (i) (+ 1 i)) (vector 3 1)))
-               (vr (vector-ref (vector 0 42 1) 1))
-               (vs (let ((v (vector 1 2)))
-                     (vector-set! v 0 4)
-                     v))
-               (v? (vector? #(1 2 3))))
+                (lst (vector->list v))
+                (sv (vector #\4 #\2))
+                (str (vector->string sv))
+                (lststr (vector-append v sv))
+                (vc (vector-copy lststr 3 4))
+                (u (vector 4 0))
+                (_ (vector-copy! u 1 (vector 4 2 0) 1 2))
+                (fv (vector 0 4 0))
+                (_ (vector-fill! fv 2 2 3))
+                (vl (vector-length (vector 0 1 2)))
+                (vm (vector-map (lambda (i) (+ 1 i)) (vector 3 1)))
+                (vr (vector-ref (vector 0 42 1) 1))
+                (vs (let ((v (vector 1 2)))
+                      (vector-set! v 0 4)
+                      v))
+               (v? (vector? #(1 2 3)))
+               )
            (list v
-                 lst
-                 str
-                 lststr
-                 vc
+               lst
+               str
+                lststr
+                vc
                  u
                  fv
                  vl
                  vm
                 vr
                 vs
-                v?))
+                v?
+                ))
          equal?
          (list #(42 4 2)
-               '(42 4 2)
-               "42"
-               #(42 4 2 #\4 #\2)
+              '(42 4 2)
+              "42"
+              #(42 4 2 #\4 #\2)
                #(#\4)
                #(4 2)
-               #(0 4 2)
+              #(0 4 2)
                3
+              #(4 2)
+              42
                #(4 2)
-               42
-                #(4 2)
-                #t))
+               #t
+               ))
 
   (test> "when" (when #t 42) = 42)
 

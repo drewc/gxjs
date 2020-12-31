@@ -1,0 +1,33 @@
+#+TITLE: Make It Smaller
+#+DATE: <2020-12-27 Sun>
+
+As of right now, <2020-12-27 Sun>, the runtime is, well, small to me yet huge to
+webpack and friends.
+
+#+begin_src shell
+$ du gxjs.js
+4420    gxjs.js
+
+$ yarn run webpack
+
+[...] WARNING in asset size limit: The following asset(s)
+exceed the recommended size limit (244 KiB). This can impact web performance.
+
+Assets: main.js (3.03 MiB)
+#+end_src
+
+
+* Prim(a|i)tes and natural selection
+
+   - [X] Vectors :: Cutting out the default vector files takes almost 1mb off
+     the ~du~. Lets try our own JS versions. See [[file:~/me/src/gxjs/doc/primitive.org::#primVec][Vectors]] in primitive.org
+
+     1) full vectors
+         : 4420    gxjs.js
+     2) No vectors?
+         : 3612    gxjs.js
+     3) My new JS vectors and bytevectors
+         : 3648    gxjs.js
+         : (2.59 MiB) for main.js
+
+         Almost 1/2 mb!

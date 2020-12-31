@@ -68,27 +68,43 @@
    (macro-force-vars (x)
      (macro-exact-int? x)))
 
+#;(##define-macro (define-js-prim-nary name js-op none one)
+  (let ((red (string-append  "((xs) => {
+    if (xs.length = 0) {
+  return g_scm2host(@3@)
+ } else (xs.length = 1) {
+  xs = [g_scm2host(@4@), xs[0]]
+ };
+return xs.reduce((a, b) => a " js-op " b) })(g_scm2host(@1@));")))
+ `(define-prim (,name . xs)
+    (##inline-host-expression ,red (##list->vector xs)))))
 
-(define-prim (##+ . xs)
+
+
+#;(define-prim (##+ . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a + b, 0) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim + ##+)
-(define-prim (##* . xs)
+#;(define-prim + ##+)
+
+#;(define-prim (##* . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a * b, 1) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim * ##*)
-(define-prim (##- . xs)
+
+
+#;(define-js-prim-nary ##* "*" 1 1)
+#;(define-prim * ##*)
+#;(define-prim (##- . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a - b) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim - ##-)
-(define-prim (##/ . xs)
+#;(define-prim - ##-)
+#;(define-prim (##/ . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a / b, 1) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim / ##/)
+#;(define-prim / ##/)
 
 
 (define-prim (##= . xs)

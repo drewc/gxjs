@@ -200,6 +200,7 @@ themselves. But I need a goal to work towards. ~R7RS-small~ has the library
 
 (define (test-r7rs)
   (test> "1 + 1 + 1 using + =" (+ 1 1 1) = 3)
+  (test> "(+ 1) using + =" (+ 1) = 1)
   (test> "1 + 1 + 1.5 using + =" (+ 1 1 1.5) = 3.5)
   (test> "2 x 2 x 2 using * =" (* 2 2 2) = 8)
   (test> "1 / 2 using / =" (/ 1 2) = 0.5)
@@ -233,7 +234,8 @@ themselves. But I need a goal to work towards. ~R7RS-small~ has the library
                              (_ (bytevector-copy! u 1 (bytevector 4 2 0) 1 2))
                              (l (bytevector-length u))
                              (four (bytevector-u8-ref bv 0))
-                             (_ (bytevector-u8-set! v 0 42)))
+                             (_ (bytevector-u8-set! v 0 42))
+                             )
 
                         (list
                          (bytevector? bv)
@@ -242,8 +244,11 @@ themselves. But I need a goal to work towards. ~R7RS-small~ has the library
                          (equal? a b)
                          (equal? u bv)
                          (= 2 l)
-                         (= 4 four)))
-         equal? '(#t #t #t #t #t #t #t))
+                         (= 4 four)
+                         ))
+         equal? '(#t #t #t #t #t #t #t
+
+                     ))
 
 
   (test> "caar ((42))" (caar '((42))) = 42)
@@ -514,47 +519,50 @@ themselves. But I need a goal to work towards. ~R7RS-small~ has the library
 
   (test> "vector"
          (let* ((v (vector 42 4 2))
-               (lst (vector->list v))
-               (sv (vector #\4 #\2))
-               (str (vector->string sv))
-               (lststr (vector-append v sv))
-               (vc (vector-copy lststr 3 4))
-               (u (vector 4 0))
-               (_ (vector-copy! u 1 (vector 4 2 0) 1 2))
-               (fv (vector 0 4 0))
-               (_ (vector-fill! fv 2 2 3))
-               (vl (vector-length (vector 0 1 2)))
-               (vm (vector-map (lambda (i) (+ 1 i)) (vector 3 1)))
-               (vr (vector-ref (vector 0 42 1) 1))
-               (vs (let ((v (vector 1 2)))
-                     (vector-set! v 0 4)
-                     v))
-               (v? (vector? #(1 2 3))))
+                (lst (vector->list v))
+                (sv (vector #\4 #\2))
+                (str (vector->string sv))
+                (lststr (vector-append v sv))
+                (vc (vector-copy lststr 3 4))
+                (u (vector 4 0))
+                (_ (vector-copy! u 1 (vector 4 2 0) 1 2))
+                (fv (vector 0 4 0))
+                (_ (vector-fill! fv 2 2 3))
+                (vl (vector-length (vector 0 1 2)))
+                (vm (vector-map (lambda (i) (+ 1 i)) (vector 3 1)))
+                (vr (vector-ref (vector 0 42 1) 1))
+                (vs (let ((v (vector 1 2)))
+                      (vector-set! v 0 4)
+                      v))
+               (v? (vector? #(1 2 3)))
+               )
            (list v
-                 lst
-                 str
-                 lststr
-                 vc
+               lst
+               str
+                lststr
+                vc
                  u
                  fv
                  vl
                  vm
                 vr
                 vs
-                v?))
+                v?
+                ))
          equal?
          (list #(42 4 2)
-               '(42 4 2)
-               "42"
-               #(42 4 2 #\4 #\2)
+              '(42 4 2)
+              "42"
+              #(42 4 2 #\4 #\2)
                #(#\4)
                #(4 2)
-               #(0 4 2)
+              #(0 4 2)
                3
+              #(4 2)
+              42
                #(4 2)
-               42
-                #(4 2)
-                #t))
+               #t
+               ))
 
   (test> "when" (when #t 42) = 42)
 
@@ -2194,6 +2202,12 @@ Compile time env for define-values.
                                                  (##cdr obj2)
                                                  ,@params))))))
                  ((##vector? obj1)
+                  (profile! 2)
+                  (if (and (##vector? obj2)
+                           (##vector-equal? obj1 obj2))
+                    (true)
+                    (false)))
+                 #;((##vector? obj1)
                   (profile! 2)
                   (if (##not (##vector? obj2))
                       (false)
@@ -3936,7 +3950,7 @@ EOF
 :CUSTOM_ID: minNums
 :END:
 
-It seems that the primative ~+~, ~-~, ~/~ and ~*~ only use fixnums.
+It seems that the primitive ~+~, ~-~, ~/~ and ~*~ only use fixnums.
 
 For now we'll hack it up by using javascript only and see how it goes. The
 reasoning behind this is that my compilations of ~_num.scm~ arrives in a 7.1MB
@@ -4018,27 +4032,43 @@ they are errors.
    (macro-force-vars (x)
      (macro-exact-int? x)))
 
+#;(##define-macro (define-js-prim-nary name js-op none one)
+  (let ((red (string-append  "((xs) => {
+    if (xs.length = 0) {
+  return g_scm2host(@3@)
+ } else (xs.length = 1) {
+  xs = [g_scm2host(@4@), xs[0]]
+ };
+return xs.reduce((a, b) => a " js-op " b) })(g_scm2host(@1@));")))
+ `(define-prim (,name . xs)
+    (##inline-host-expression ,red (##list->vector xs)))))
 
-(define-prim (##+ . xs)
+
+
+#;(define-prim (##+ . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a + b, 0) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim + ##+)
-(define-prim (##* . xs)
+#;(define-prim + ##+)
+
+#;(define-prim (##* . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a * b, 1) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim * ##*)
-(define-prim (##- . xs)
+
+
+#;(define-js-prim-nary ##* "*" 1 1)
+#;(define-prim * ##*)
+#;(define-prim (##- . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a - b) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim - ##-)
-(define-prim (##/ . xs)
+#;(define-prim - ##-)
+#;(define-prim (##/ . xs)
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a / b, 1) })(g_scm2host(@1@));"
    (##list->vector xs)))
-(define-prim / ##/)
+#;(define-prim / ##/)
 
 
 (define-prim (##= . xs)
@@ -5348,11 +5378,14 @@ they are errors.
 ;;(incl "min/eval.scm")
 (incl "min/list.scm")
 ;; (incl "min/error.scm")
-(incl "min/vector.scm")
+;;(incl "min/vector.scm")
+(incl "min/vec.scm")
 (incl "min/structure.scm")
 (incl "min/symkey.scm")
 (incl "min/char.scm")
 (incl "min/string.scm")
+(incl "min/str.scm")
+(incl "min/num.scm")
 (incl "min/nums.scm")
 (incl "min/num/qrm.scm")
 ;(incl "min/num/gcdlcm.scm")
@@ -5437,3 +5470,8 @@ echo 'Done!!'
 }
 du gxjs.js  ; make_gxjs ; du gxjs.js ; yarn run webpack
 #+end_src
+
+# Local Variables:
+# org-babel-noweb-wrap-start: "{%"
+# org-babel-noweb-wrap-end: "%}"
+# End:

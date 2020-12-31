@@ -1,0 +1,6 @@
+(define-prim (##string->vector str)
+  (##inline-host-expression "(@1@).codes.map((c) => new G_Char(c));" str))
+(define-prim string->vector ##string->vector)
+(define-prim (##vector->string vec)
+  (##inline-host-expression "new G_ScmString((@1@).map((char) => char.code))" vec))
+(define-prim vector->string ##vector->string)
