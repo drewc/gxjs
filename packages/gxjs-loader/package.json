@@ -1,0 +1,16 @@
+{
+  "name": "gxjs-loader",
+  "version": "0.0.1",
+  "description": "(G)erbil E(x)tended (J)avaScript (S)cheme loader",
+  "main": "dist/gxjs-loader.js",
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "MIT",
+  "dependencies": {
+    "node-pty": "^0.10.0",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "which": "^2.0.2"
+  }
+}
