@@ -1,6 +1,6 @@
 {
   "name": "gxjs-loader",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "(G)erbil E(x)tended (J)avaScript (S)cheme loader",
   "main": "dist/gxjs-loader.js",
   "repository": "git@github.com:drewc/gxjs.git",
