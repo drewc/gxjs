@@ -1,0 +1,1439 @@
+#+TITLE: GxJS Loader, to load GxJS files
+
+
+#+begin_src shell
+cd packages/ ; mkdir gxjs-loader/ ; cd gxjs-loader; yarn init
+yarn run lerna add which packages/gxjs-loader --dev
+yarn run lerna add path packages/gxjs-loader
+yarn run lerna add node-pty packages/gxjs-loader
+#+end_src
+
+
+* Usage
+
+*GxJS Loader* is used to take either source code written in *Gerbil* or *Gambit*
+ scheme and transpile them to *JavaScript*.
+
+** Gerbil
+
+ To start with here's a *Gerbil* file (~.ss~) that mixes *JavaScript* code with
+ *Gerbil* code.
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gxjs-loader-usage.ss
+(import :js)
+
+(js#declaration "console.log('started GxJS loader!')")
+
+(def property-name "This is valid")
+
+(def GxJS-jso
+  {
+    thisIsTheAnswer: 42
+    'this "is how we make the moonshine"
+    property-name 'symbols-have-no-js-value!
+  })
+
+
+(def (this-is-gxjs! (val 42))
+  (js#statement "console.log('This is GxJS!', (@1@), (@2@), (@3@))"
+                val
+                (js#foreign->js GxJS-jso)
+                (js#scm->js (string-append "string " "append"))))
+
+(js#statement "console.log('finished GxJS loader');
+ module.exports = RTS.scm2host(@1@);" this-is-gxjs!)
+#+end_src
+
+Now a *JavaScript* file that requires what we export, calls what we export, and
+exports what we export.
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gxjs-loader.js
+const GxJS = require('gxjs-loader!./gxjs-loader-usage.ss')
+
+GxJS('yay!');
+
+module.exports = GxJS;
+#+end_src
+
+When run at the shell after compilation with ~node -e~ that outputs:
+
+#+begin_src javascript
+started GxJS loader!
+finished GxJS loader
+This is GxJS! { codes: [ 121, 97, 121, 33 ] } {
+  thisIsTheAnswer: 42,
+  this: 'is how we hake the moonshine',
+  'This is valid': {
+    name: 'symbols-have-no-js-value!',
+    hash: 386716666,
+    interned: true
+  }
+} string append
+#+end_src
+
+Note that the RTS took our ~'yay!'~ *JavaScript* string and turned it into a
+scheme string when calling the function.
+
+** Gambit
+
+*Gerbil* itself transpiles its Meta-Scheme dialect to *Gambit* scheme. If we
+want to compile a *Gambit* scheme file without calling ~gxc~, the gerbil
+compiler, we can do so.
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gxjs-loader-usage.scm
+(declare (extended-bindings))
+
+(##inline-host-declaration "console.log('Started Gambit-only GxJS loader!')")
+
+(define property-name "This is valid")
+
+(define GxJS-vector
+  (##vector
+   property-name 42
+   'this "is how we hake the moonshine"))
+
+
+(define (this-is-gambit-gxjs! #!optional (val 42))
+  (##inline-host-statement "console.log('This is GxJS!', (@1@), (@2@))"
+               val GxJS-vector))
+
+(##inline-host-statement "console.log('finished Gambit-only GxJS loader');
+ module.exports = RTS.scm2host(@1@);" this-is-gambit-gxjs!)
+#+end_src
+
+Now a *JavaScript* file that requires what we export, calls what we export, and
+exports what we export.
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gxjs-gambit-loader.js
+const gambitGxJS = require('gxjs-loader!./gxjs-loader-usage.scm')
+
+gambitGxJS('gambitYay!');
+
+module.exports = gambitGxJS;
+#+end_src
+
+#+begin_src shell
+cd ../gxjs-loader/ && yarn run webpack && du -h dist/* && cd - ; echo "TESTING"; echo; cd ../gxjs-tests/; yarn run webpack ; node -e "require ('./dist/main.js')"
+#+end_src
+
+** Options: Make the JS code differ
+
+By default the loader just loads the scheme file, using Gerbil then Gambit to
+compile it first, into the ~gxjs~ runtime system.
+
+It does so by adding ~const RTS = require('gxjs')~ to the top, then wrapping the
+output from the compiler in an ~ArrowFunctionExpression~ that it calls.
+
+If the extenstion is ~.scm~ we do not call Gerbil at all, by default.
+
+
+But that can be changed. Mostly for developing the runtimes things need changing
+around. Here are the options.
+
+     - ~-link~ :: If this is passed and not false make a link file that has the
+       RTS definition and do not require any RTS's.
+
+     - ~return~ :: When this is passed a symbol name then the very end of the
+       code has a ~return~ statement for that symbol. i.e.
+       ~gxjs-loader?-linkreturn=RTS~ adds that.
+
+     - ~call~ :: All the generated code is wrapped in an
+       ~ArrowFunctionExpression~, mostly to isolate it and deal with scope. If
+       we want to call that function, which be default we do, ~call~ contains
+       the arguments we wish to call it with. Default: ~[]~.
+
+       If ~false~ we do not call the generated function.
+
+     - ~exports~ :: Do we want to place a ~module.exports =~ before the function
+       or function call expression? If this is passed and not ~false~, yes, yes
+       we do. i.e.
+       ~'gxjs-loader?-link&return=RTS&exports!./gxjs-link-loader-runtime.ss'~
+
+     - ~args~ :: This is an array of parameters to declare the ArrowFunction
+       with. By default ~[]~ of course.
+
+     - ~RTS~ :: If is is a /string/ that becomes the argument that we ~require~
+       for ~const RTS~ to become the runtime system. If it's ~false~ there is no
+       RTS required.
+
+       i.e.
+       ~'gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./gxjs-link-loader-runtime.ss'~
+       or ~'gxjs-loader?RTS=./gxjs-link-loader.js!./gxjs-link-use-runtime.ss'~
+
+
+
+*** ~-link~ to create and embed a runtime system.
+
+Most of the time there is a ~const RTS = require('gxjs')~ inserted in the file.
+
+But sometimes, like, so far, the one time I needed to create the runtime
+contained in ~'gxjs'~, we actually want the compiler to create one for us.
+
+Let's create the runtime we want, which is the smallest. Essentially all it does
+is change the upstream (Gambit ~v4.9.3~) module initialization to one that
+always runs.
+
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gxjs-link-loader-runtime.ss
+(import :js)
+
+(js#statement #<<EOF
+RTS.module_register = function(module_descr) {
+  const r = this;
+  r.sp = -1;
+  r.stack[++this.sp] = void 0;
+  r.r0 = this.underflow;
+  r.nargs = 0;
+  r.trampoline(module_descr[4]);
+};
+
+EOF
+)
+
+#+end_src
+
+And now the ~js~ to use it.
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gxjs-link-loader.js
+const RTS = require('gxjs-loader?-link&return=RTS&exports!./gxjs-link-loader-runtime.ss');
+const extraRunTime = require('gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./gxjs-link-loader-runtime.ss');
+
+extraRunTime(RTS);
+console.log('New RTS:', RTS.glo, extraRunTime)
+
+module.exports = RTS;
+#+end_src
+
+Now we can use that RTS elsewhere
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gxjs-link-use-runtime.ss
+(import :js)
+(js#declaration "console.log('Using another RTS,', RTS.glo)")
+(js#statement "module.exports = 42")
+#+end_src
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gxjs-link-use-runtime.js
+const answer = require('gxjs-loader?RTS=./gxjs-link-loader.js!./gxjs-link-use-runtime.ss')
+
+module.exports = answer;
+#+end_src
+
+* Loader
+
+
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/gxjs-loader.js
+const gerbil = require('gerbil-loader');
+const spawn_gsc = require ('./gsc.js')
+const spawn_gxc = require ('./gxc.js')
+const path = require('path');
+const fs = require('fs');
+
+const { ensureAST, generate } = require('./syntax.js')
+const minimizeGambitNamespace = require ('./namespace-min.js')
+const lexify = require('./lexify.js')
+const wrapArrow = require('./wrap-arrow.js')
+const wrapCallExpression = require('./call-wrapper.js')
+const prependConstRTS = require('./const-RTS.js')
+const wrapModuleExports = require('./module-exports.js')
+
+const changeModInit = require('./module-registry-init.js')
+
+function allFiles (things) { // files are strings
+  return things.filter(x => typeof x === 'string');
+};
+
+function getCallback (things) { //callbacks are functions
+  return things.filter(x => typeof x === 'function')[0];
+}
+
+function getCwd (options, files) {
+  const cwd = options.cwd
+  return cwd !== undefined ? cwd : path.dirname(files[files.length - 1]);
+}
+
+function callGerbil(options, ...filesAndCallback) {
+
+  const files = allFiles(filesAndCallback);
+  const callback = getCallback(filesAndCallback);
+  const cwd = getCwd(options, files);
+
+  console.log('callback', callback)
+
+  const verbose = ((v) => v === undefined ? false : v)(options['-v']);
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+  log("calling gxs, ", cwd,  ...files, options)
+  spawn_gxc(cwd, gerbil => callback(gerbil), ...files);
+
+  return;
+}
+
+function callGambit(options, ...filesAndCallback) {
+
+  const files = allFiles(filesAndCallback);
+  const callback = getCallback(filesAndCallback);
+  const cwd = getCwd(options, files);
+
+  const verbose = ((v) => v === undefined ? false : v)(options['-v']);
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+  log("calling Gambit, ", ...files, options)
+
+  spawn_gsc( { cwd: cwd, '-link': options['-link'] } , gambit => callback(gambit), ...files);
+
+  return;
+}
+
+function loadGxJS(options, ...filesAndCallback) {
+
+  const files = allFiles(filesAndCallback);
+  const callback = getCallback(filesAndCallback);
+  const cwd = getCwd(options, files);
+
+  const RTSrequire = (req => req === undefined ? 'gxjs' : (req === 'false' ? false : req))(options['RTS']);
+  options.RTS = RTSrequire;
+
+
+  const arrowArgs = ((args) => {
+    return (typeof args === 'string') ? JSON.parse(args) : args
+  })((options.args !== undefined) ? options.args : false);
+  const arrowReturn = ((options.return !== undefined) ? options.return : false);
+  const arrowCall = (c => {
+   if (c !== undefined) {
+     if (c === 'false') { return false } else {return c}
+   } else {
+     return true
+   }
+  })(options.call);
+
+  const verbose = ((v) => v === undefined ? false : v)(options['-v']);
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+  // only run gsc?
+  const gscOnly = ((o)  => {
+    const gsc = path.extname(files[0]) === '.scm';
+    const runit = ((gsc && o.gxc === undefined) || o.gxc === false);
+
+    log("Run gsc only?", runit, '!gxc', o.gxc === false, 'gsc', gsc);
+    return runit;
+  })(options)
+
+  const addModuleExports = (e => (e === undefined) ? false : (e === '') ? true : e)(options.exports);
+  const gambitLink = (l => (l === undefined) ? false : (l === '') ? true : l)(options.['-link']);
+
+
+  function rm_rf (dir) {
+    if (dir) {
+      fs.rmdir(dir, { recursive: true }, () => {
+        log("Folder", dir, "for output of", files, "Deleted.");
+      });
+    }
+  };
+
+  log('\n-----------------------\nLoading: ', files, options)
+
+  log("Run gsc only?", gscOnly)
+  const runGxc = (() => {
+    if (!gscOnly) {
+      return callGerbil
+    } else {
+      return function (...args)  {
+       log("Not running gxc for", ...files)
+        getCallback(args)({ root: false, error: false, outputs: files });
+      };
+    }
+  })();
+
+
+  // First, unless specified otherwise, we compile Gerbil to Gambit
+  runGxc(options, ...files, (gerbil) => {
+    log('Compiled Gerbil?:', gerbil)
+    if (gerbil.error) {
+      rm_rf(gerbil.root);
+      callback(gerbil.error); return;
+    }
+
+    // Now take those Gambit files and compile to JavaScript
+
+    const gscFiles = gerbil.outputs
+
+    callGambit(options, ...gscFiles, (gambit) => {
+      log("Compiled Gambit? :", gambit)
+      if (!!gambit.error) {
+        rm_rf(gambit.root);
+        callback(gambit.error) ; return;
+      }
+
+      // Awesome, we now have some javascript files. That allows us to read the
+      // file and delete all the temporary things.
+
+      let error = false;
+
+      let AST = false;
+      let ASTs = ( files => {
+        if (!error) {
+          return files.map (path => {
+            if (!error) {
+              // read the file as a string
+              const str = (() => {
+                log('\nReading AST from', path)
+                try {
+                  return fs.readFileSync(path, {encoding: 'utf8'})
+                } catch (e) { error = e }
+              })();
+
+              if (error) {return};
+
+              // make it into an AST
+              const AST = (() => {
+                try {
+                  return ensureAST(str)
+                } catch(e) {error = e }
+              })();
+
+              if (!error) {
+                return AST;
+              }
+            }
+          })
+        }
+      })(gambit.outputs);
+
+      log('Have', ASTs.length, 'ASTs', 'link?', gambitLink)
+      if (!error) {
+        try {
+          if (!gambitLink) {
+            // Minimize things in "__GxJS__.*" namespace.
+            // i.e.:  __GxJS.bb1_runtime_23_.name => a.b.name
+            ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
+          } else {
+            // Change the module init to not need `_gambit`
+            log('Changing mod registry init')
+            ASTs = ASTs.map( ast => changeModInit(ast, { verbose: verbose }) )
+          }
+
+          // No Undeclared Globals Allowed!!
+          ASTs = ASTs.map( ast => lexify(ast, { verbose: verbose }));
+
+          // if there are many ASTs make it into one.
+          log('Concat ASTs into one AST');
+          ASTs.map(ast => {
+            return !AST ? AST = ast : ast.body.map(x => AST.body.push(x))
+          })
+
+          // Wrap the entire concatenated file/AST in an ArrowFunctionExpression
+          AST = wrapArrow(AST, arrowArgs, arrowReturn, {verbose: verbose});
+
+          log("")
+
+          // If we call the arrow, now's the time to wrap it that way
+          if (arrowCall) {
+            AST = wrapCallExpression(AST, arrowCall, { verbose: verbose })
+          }
+
+          // regardless, do we want to add a `module.exports =` before that form?
+          if (addModuleExports) {
+            AST = wrapModuleExports(AST);
+          }
+
+
+          // Most modules need a runtime system. By default ours is "gxjs"
+          if (RTSrequire && !gambitLink) {
+            AST = prependConstRTS(AST, RTSrequire, { verbose: verbose })
+          }
+
+
+        } catch(e) {error = e};
+
+
+      }
+
+      rm_rf(gambit.root);
+      rm_rf(gerbil.root);
+      log('Generated source', generate(AST))
+      if (error) {
+        callback(error)
+      } else {
+        callback(null, generate(AST));
+      }
+    });
+  })
+
+  return;
+
+}
+
+function gxjsLoader () {
+  const callback = this.async()
+  const rpath = this.resourcePath
+  const options = this.getOptions();
+
+  const cwd = path.dirname(this.resourcePath);
+
+  const RTSrequire = (req => req === undefined ? 'gxjs' : req)(options['RTS']);
+  options.RTS = RTSrequire;
+
+  const devVerbose = this.mode === 'development'
+  const verbose = ((v) => v === undefined ? devVerbose : v)(options['-v']);
+  options['-v'] = verbose
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+  log("Loading GxJS using gxjsLoader: ", rpath, options)
+
+  loadGxJS(options, rpath, callback);
+
+
+}
+
+module.exports =  gxjsLoader
+module.exports.loadGxJS = loadGxJS;
+#+end_src
+
+
+* ~RTS.module_registry_init~: like ~-u~ only with full ~RTS~.
+
+For the RTS, we link in everything even if not needed. In the usage demo right
+now the compiler outputs an init that needs the ~_gambit~ module.
+
+ie:
+
+#+begin_src shell
+gsc -target js -prelude '(include "~~lib/_gambit#.scm")' -repr-module class -namespace '__GxJS_' \
+    -link -o RTS.js loadme.js runtime.js
+#+end_src
+  : =>
+#+begin_src javascript
+/// [...]
+RTS.module_registry_init(
+  [
+    new RTS.ModLinkInfo("_gambit",0),
+    new RTS.ModLinkInfo("loadme",1),
+    new RTS.ModLinkInfo("runtime",2)
+  ]
+);
+#+end_src
+
+In reality we want something similar to the way ~gsc -link -u runtime~ works,
+only with a full ~RTS~.
+
+For example :
+
+#+begin_src shell
+gsc -target js -prelude '(include "~~lib/_gambit#.scm")' -repr-module class -namespace '__GxJS_' \
+    -link -flat -o RTS.js runtime.scm loadme.js
+#+end_src
+
+That's almost exactly what we want, but with a full ~RTS.js~. Also note how we
+reversed them? That gives us this.
+
+#+begin_src javascript
+RTS.module_registry_init([new RTS.ModLinkInfo("runtime",0),new RTS.ModLinkInfo("loadme",1)]);
+#+end_src
+
+That's what I want. The last to be first after the first disappears. Easy!
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/module-registry-init.js
+const { ensureAST, generate, walk } = require('./syntax.js')
+
+let verbose = false;
+function log (...args) { if (verbose) { console.log(...args) } };
+
+function findModInit(body) {
+  return body.find(e => {
+    return (
+      e.type === 'ExpressionStatement'
+        && e.expression.type === 'CallExpression'
+        && e.expression.callee.type === 'MemberExpression'
+        && e.expression.callee.object.name === 'RTS'
+        && e.expression.callee.property.name === 'module_registry_init'
+    )
+  })
+}
+
+module.exports = function (source, options = {verbose: false}) {
+  const AST = ensureAST(source);
+  const mod_init = findModInit(AST.body);
+  const mods = mod_init.expression.arguments[0].elements;
+  const first_literal = mods[0].arguments[0]
+  const last_literal = mods[mods.length -1].arguments[0]
+
+  verbose = ((v) => v === undefined ? false : v)(options['verbose']);
+  log('Changing mod_reg_init from: ', generate(mod_init))
+
+  first_literal.value = last_literal.value;
+  first_literal.raw = last_literal.raw;
+
+  mods.pop();
+
+  log('Changed mod_reg_init to: ', generate(mod_init))
+  return AST;
+}
+
+
+#+end_src
+
+* Run rime system? ~const RTS = require($gerbil)~
+
+By default a compiled file expects there to be an ~RTS~ variable that defines
+the runtime system for *Gerbil*.
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/const-RTS.js :noweb yes
+const { ensureAST, generate } = require('./syntax.js')
+
+let verbose = false;
+function log (...args) { if (verbose) { console.log(...args) } };
+function makeConstRTS(value = 'gerbil-scheme') {
+  const raw = "'" + value + "'"
+  const rts = {
+    type: 'VariableDeclaration',
+    declarations: [
+      {
+        type: 'VariableDeclarator',
+        id: { type: 'Identifier', name: 'RTS' },
+        init: {
+          type: 'CallExpression',
+          callee: { type: 'Identifier', name: 'require' },
+          arguments: [
+            {
+              type: 'Literal',
+              value: value,
+              raw: raw
+            }
+          ],
+          optional: false
+        }
+      }
+    ],
+    kind: 'const'
+  };
+  return rts;
+}
+
+function prependConstRTS(source, id = 'gxjs', options = { verbose: false }) {
+  const AST = ensureAST(source);
+  const constRTS = makeConstRTS(id);
+  verbose = ((v) => v === undefined ? false : v)(options['verbose']);
+  log("Adding", generate(constRTS), 'to top')
+  AST.body.unshift(constRTS);
+  return AST;
+}
+
+module.exports = prependConstRTS
+#+end_src
+
+* Wrap a *CommonJS* ~module.exports~ ExpressionStatement
+
+Especially if we are a non-callable arrow function, or we return something from that function, it's quite nice to have a ~module.exports=~
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/module-exports.js :noweb yes
+const { ensureAST } = require('./syntax.js')
+let verbose = false;
+function log (...args) { if (verbose) { console.log(...args) } };
+function makeModuleExportsStatement(expression) {
+  return {
+    type: 'ExpressionStatement',
+    expression:  {
+      type: 'AssignmentExpression',
+      operator: '=',
+      left: {
+        type: 'MemberExpression',
+        object: { type: 'Identifier', name: 'module' },
+        property: { type: 'Identifier', name: 'exports' },
+        computed: false,
+        optional: false
+      },
+      right: expression
+    }
+  }
+};
+
+function wrapModuleExports(source) {
+  const AST = ensureAST(source);
+  const exp = AST.body[0].expression;
+
+  if (exp === undefined) { throw 'No expression to export in body[0]' }
+
+  AST.body[0] = makeModuleExportsStatement(exp);
+  return AST;
+}
+
+module.exports = wrapModuleExports
+#+end_src
+
+
+* Call that wrapper! ~call-wrapper.js~
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/call-wrapper.js :noweb yes
+const { ensureAST, generate, walk } = require('./syntax.js')
+
+
+let verbose = false;
+function log (...args) { if (verbose) { console.log(...args) } };
+
+function makeCallExpression (exp_statement, args = []) {
+  return {
+    type: 'ExpressionStatement',
+    expression: {
+      type: 'CallExpression',
+      callee: exp_statement.expression ,
+      arguments: args,
+      optional: false
+    }
+  }
+
+}
+
+function wrapCallExpression (source, args = [], options = { verbose: false }) {
+  const AST = ensureAST(source);
+  AST.body = [makeCallExpression(AST.body[0], args)]
+  verbose = ((v) => v === undefined ? false : v)(options['verbose']);
+  log('Calling', AST.body[0].type, 'with ...args:', args)
+  return AST;
+}
+
+module.exports = wrapCallExpression;
+
+#+end_src``
+
+
+* Arrow Function Wrapper: ~wrap-arrow.js~
+
+To guarantee that none of the declared variables are declared in global scope we
+wrap an arrow function around it.
+
+Also, for most modules the Gambit runtime is needed. Known as ~RTS~ to the
+Gambit compiler, the output from ~-o -target js~ relies on ~RTS~ being bound. We
+can make that an argument to the function.
+
+When we call that function matters as well as what it returns. For most modules
+we do not care in the least as it's just to load and initialize the module.
+
+For the ~RTS~ actually returning the ~RTS~ object means that we can call the
+modules with the ~RTS~. And for other modules returning the RTS does mean that
+we can mix them, or something, or perhaps it's just easier for now to leave it
+at that.
+
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/wrap-arrow.js :noweb yes
+const { ensureAST, generate, walk } = require('./syntax.js')
+
+let verbose = false;
+function log (...args) { if (verbose) { console.log(...args) } };
+
+function makeID(name) { return { type: 'Identifier', name: name } };
+
+function makeArrow(_body, args = false) {
+  const params = (args instanceof Array) ? args.map(makeID) : [];
+  const body = { type: 'BlockStatement', body: _body }
+
+  return {
+    type: 'ExpressionStatement',
+    expression: {
+      type: 'ArrowFunctionExpression',
+      params: params,
+      body: body,
+      id: null,
+      expression: false,
+      generator: false,
+      async: false,
+    }
+  }
+};
+
+
+function makeReturn(id) {
+ return {
+    type: 'ReturnStatement',
+    argument: id
+  }
+}
+
+function wrapArrow(source, args = false, returnArgument = false, options = { verbose: false }) {
+  const AST = ensureAST(source);
+  const arrow = makeArrow(AST.body, args)
+  const arrowBody = arrow.expression.body.body;
+  AST.body = [arrow]
+  verbose = ((v) => v === undefined ? false : v)(options['verbose']);
+  if (returnArgument) {
+    if (typeof returnArgument === 'string') {
+      returnArgument = makeReturn(makeID(returnArgument));
+      arrowBody.push(returnArgument);
+    }
+  }
+  log("Wrapping arrow with args?", args, 'and return?', returnArgument);
+  return AST;
+}
+
+module.exports = wrapArrow;
+
+#+end_src
+
+* ~lexify~, to get rid of undeclared globals and be ~strict~
+
+*ES6 Modules* are a great way to contain *JavaScript* code without polluting the
+global namespace. In fact, *ES6* modules are automatically strict-mode code,
+even if you don’t write ~use strict;~ in them.
+
+Because of that our code must conform. As strict mode makes it impossible to
+accidentally create global variables we can see where gambit does do, usually by
+accident, and fix it.
+
+** All declared variables
+
+JavaScript’s main ways of declaring variables:
+
+ - ~let~ ::  declares mutable variables.
+ - ~const~ ::  declares constants (immutable variables).
+ - ~var~ :: Before ES6 there was also var. Similar to ~let~ but should now be
+   avoided.
+
+Ok! So any node that declares a variable is of ~(type ===
+'VariableDeclaration')~. A predicate will do.
+
+#+begin_src javascript :noweb-ref varDecP
+function varDecP (obj) {return (obj.type === 'VariableDeclaration')}
+#+end_src
+
+Any ~ExpressionStatement~ with an expression of type ~AssignmentExpression~
+where the left side is an ~Identifier~ and the operator is ~=~ should be looked
+at.
+
+#+begin_src javascript :noweb-ref isAssP
+function isAssP (obj) {
+  return (obj.type === 'ExpressionStatement'
+          && obj.expression.type === 'AssignmentExpression'
+          && obj.expression.left.type === 'Identifier'
+          && obj.expression.operator === '=')
+}
+#+end_src
+
+Now to determine if we are assigning to a "global", that is to say an undeclared
+variable, we collect all the declarations and see if the identifier lines up.
+
+If we cannot find it, it's now a "global'.
+
+#+begin_src javascript :noweb-ref isGlobalAssP
+function isGlobalAssP (obj, decs) {
+  const name = obj.expression.left.name;
+  // console.log('Global?', name,
+  // decs.map(dec => dec.declarations.map(d => d.id.name === name)));
+  return !decs.find(dec => dec.declarations.find(d => d.id.name === name));
+}
+#+end_src
+
+We don't want globals. So, first make a declaration out of the assigment
+expression. We'll use ~let~ as right now *Gambit* uses ~var~ and we can see what
+we mutate easily.
+
+#+begin_src javascript :noweb-ref makeVarDecFromAss
+function makeVarDecFromAss(ass) {
+  return {
+    type: 'VariableDeclaration',
+    kind: 'let',
+    declarations: [
+    {
+      type: 'VariableDeclarator',
+      id: ass.expression.left,
+      init: ass.expression.right
+    }
+  ]
+  }
+}
+#+end_src
+
+Now mutate the assignment node into a declaration node.
+
+#+begin_src javascript :noweb-ref mutateAssIntoDec
+function mutateAssIntoDec (ass) {
+  const dec = makeVarDecFromAss(ass);
+  const keys = Object.keys(ass);
+  keys.map(k => { delete ass[k] });
+  Object.assign(ass, dec);
+  return dec;
+}
+#+end_src
+
+That's wonderful and it works. Really just one more thing. Basically if a node
+has a ~.body~ property we filter that body looking for variable declarations.
+Also for a function go through the parameters and giv'r.
+
+#+begin_src javascript :noweb-ref findVarDecs
+function findVarDecs(node, collection = []) {
+  if (node.body === undefined) { return collection }
+  if (node.body instanceof Array) {
+    node.body.filter(varDecP).map (dec => collection.push(dec))
+  } else if (varDecP(node.body)) {
+    collection.push(node.body)
+
+  } else if (node.type === 'FunctionDeclaration'
+             || node.type === 'FunctionExpression'
+             || node.type === 'ArrowFunctionExpression'
+            ) {
+    node.params.map(id => {
+      const ident = (id.type === "RestElement") ? id.argument : id;
+      // console.log('Function Arg:', ident.name);
+      collection.push(makeVarDecFromAss(
+        { expression: { left: ident } }))
+    })
+    // console.log('Added Functions Args', collection, node)
+  } else {
+    findVarDecs(node.body, collection)
+  }
+  // console.log("Found Var Decs in", node.type, collection)
+  return collection;
+}
+#+end_src
+
+Walk the ~AST~ and look for 'ExpressionStatement's that are ~isAssP~.
+
+#+begin_src javascript :noweb-ref mutateAssAST
+function mutateAssAST (AST) {
+  walk.ancestor(AST, {
+    ExpressionStatement (n, ancestors) {
+      if (isAssP(n)) {
+        const decs = []
+        // console.log("Assigment", n, ancestors);
+        ancestors.map(n => findVarDecs(n, decs));
+        if (isGlobalAssP(n, decs)) {
+          log("Global =>", n.expression.left.name,'<= becoming a let');
+          mutateAssIntoDec(n);
+          // console.log(generate(n));
+        }
+      }
+    },
+    // Literal(_, ancestors) {
+    //   console.log("This literal's ancestors are:", ancestors.map(n => n.type))
+    // }
+  })
+}
+#+end_src
+
+** ~lexify.js~
+#+begin_src javascript :noweb yes :tangle ../packages/gxjs-loader/lexify.js
+const { ensureAST, generate, walk } = require('./syntax.js')
+
+let verbose = false;
+function log (...args) { if (verbose) { console.log(...args) } };
+
+function ass2var(assign) {
+  var vardec = {
+    type: 'VariableDeclaration',
+    declarations: [
+      {
+        type: 'VariableDeclarator',
+        id: assign.expression.left,
+        init: {
+          type: 'FunctionExpression',
+          id: null,
+          expression: false,
+          generator: false,
+          async: false,
+          params: [],
+          body: { type: 'BlockStatement', body: [] }
+        }
+      }
+    ],
+    kind: 'var'
+  };
+  return vardec;
+}
+
+// Variable declaration
+<<varDecP>>
+
+// Assigment Expression
+<<isAssP>>
+
+// Global?
+<<isGlobalAssP>>
+
+// Make a declaration
+<<makeVarDecFromAss>>
+
+// Mutate the assigment
+<<mutateAssIntoDec>>
+
+<<findVarDecs>>
+<<mutateAssAST>>
+
+function lexify(code, options = { verbose: false }) {
+  const AST = ensureAST(code);
+  const body = AST.body
+
+  verbose = ((v) => v === undefined ? false : v)(options['verbose']);
+  mutateAssAST(AST);
+  return AST;
+}
+
+module.exports = lexify;
+
+
+// function(content, _, _AST) {
+//   const callback = this.async();
+//   const AST = (typeof _AST === 'object') ? _AST : acorn.parse(content);
+//   const ass = AST.body[0];
+//   const lex = ass2var(ass);
+//   const ret = returnVar(ass);
+//   AST.body[0] = lex;
+//   AST.body.push(ret);
+//   const body = wrapFnExp(AST.body);
+//   AST.body = [body];
+
+//   // console.log(acorn.parse('() => {return foo}').body[0].expression.body.body);
+//   // console.log(acorn.parse('(RST) => { var foo = 1; return foo };').body[0]);
+//   callback(null, generate(AST), null, AST);
+// }
+#+end_src
+
+
+
+* Minimize object and properties in ~-namespace "__GxJS_"~
+:PROPERTIES:
+:CUSTOM_ID: minNamespace
+:END:
+
+*Gambit* has a namespace for each module/file. We set it to prefix with
+~__GxJS_~ so that, for example, a file called ~runtime.scm~ usually ends up
+starting with making a variable that is that namespace.
+
+#+begin_src javascript
+__GxJS_runtime = function () {};
+#+end_src
+
+Then everything else it generates is a property of that object.
+
+#+begin_src javascript
+__GxJS_runtime.bb1_runtime_23_ = function () { /* entry-point ... */};
+__GxJS_runtime.bb1_runtime_23_._name = RTS.make_interned_symbol("runtime#")
+ #+end_src
+
+So, we'll take the ~__GxJS_(.*)~ and turn it into the shortest variable
+possible, usually ~a~ if that is not used.
+
+It also turns out that most properties on that variable can be shortened. A
+quick look says "any property that .startsWith 'bb'" so we do so, usually
+starting at ~b~.
+
+Since we can actually make a variable with those names, just to avoid messing it
+up, we'll disallow re-use of any symbol.
+
+#+begin_src javascript :noweb-ref findIds
+const ids = {};
+function findIds(AST) {
+  walk.simple(AST, {
+   Identifier(id) { ids[id.name] = true }})
+}
+#+end_src
+
+Now for generating symbols we'll have a ~gensym~ which gives us the shortest
+unused name.
+
+#+begin_src javascript :noweb-ref gensym
+const syms = {};
+const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const limit = chars.length;
+
+var n = -1;
+
+function gensym () {
+  n++;
+  if (n < limit) {
+    return chars[n]
+  };
+
+  function make_gensym_prefix(firstn) {
+    if (firstn > limit) {
+      return make_gensym(firstn) + make_gensym(firstn - limit)
+    } else {
+      return chars[(firstn - 1)]
+    }
+
+  };
+
+  const firstn = parseInt(n / limit);
+  const sn = n - (limit * firstn);
+  const secondn = chars[sn];
+  // console.log(n, limit, firstn, sn, secondn)
+  return make_gensym_prefix(firstn) + secondn;
+
+};
+#+end_src
+
+When we give a symbol to minimize, always return the same identifier.
+
+#+begin_src javascript :noweb-ref minsym
+function minsym(name) {
+  const sym = syms[name];
+  if (sym === undefined) {
+    nsym = gensym();
+    if (ids[nsym] !== undefined) {
+     return minsym(name)
+    }
+    syms[name] = nsym;
+    log("Minimize", name, "to", nsym);
+    return minsym(name);
+  } else {
+    return sym }
+}
+#+end_src
+
+First time around we'll just change the properties but minimize the name
+beforehand in order to keep it as short as possible.
+
+#+begin_src javascript :noweb-ref minimize-props
+ walk.simple(AST, {
+    MemberExpression(exp) {
+      const oname = (exp.object.type === 'Identifier') ? exp.object.name : '';
+      const pname = exp.property.name;
+      if (oname !== undefined && oname.startsWith('__GxJS_') && pname.startsWith('bb')) {
+        exp.property.name = minsym(pname);
+      }
+    },
+   Identifier(node) { // first pass just make a gen symbol to keep it short
+     if (node.name.startsWith('__GxJS_')) { minsym(node.name) }
+   },
+  })
+
+#+end_src
+
+That does not seem to cover them all for we also assign to properties of
+properties. We'll do that as well as also minimize all our identifiers.
+
+#+begin_src javascript :noweb-ref minimize-rest
+walk.simple(AST, {
+  AssignmentExpression(n) {
+    const iname = (n.left.type === 'Identifier') ? n.left.name : '';
+    if (iname !== undefined && iname.startsWith('__GxJS_')) {
+      n.left.name = minsym(iname);
+    }
+  },
+  Identifier(node) {
+    // now minimize that symbol as we no longer need it for the member
+    // expression
+    if (node.name.startsWith('__GxJS_')) { node.name = minsym(node.name) }
+  },
+})
+#+end_src
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/namespace-min.js :noweb yes
+const { ensureAST, generate, walk } = require('./syntax.js')
+
+<<findIds>>
+
+<<gensym>>
+
+<<minsym>>
+
+function newEnvironment () {
+  n = -1;
+}
+
+let verbose = false;
+
+function log (...args) { if (verbose) { console.log(...args) } };
+
+function minimizeGambitNamespace (source, options = { verbose: false }) {
+  const AST = ensureAST(source);
+
+   verbose = ((v) => v === undefined ? false : v)(options['verbose']);
+
+  <<minimize-props>>
+
+  <<minimize-rest>>
+
+  return AST;
+}
+
+module.exports = minimizeGambitNamespace
+module.exports.newEnvironment = newEnvironment;
+
+
+#+end_src
+
+
+* Syntax in JS: parse to, walk and print ~AST~'s
+
+For parsing the ~js~ we are using *Acorn* : "A tiny, fast JavaScript parser
+written in JavaScript".
+
+Parsing is easy enough.
+
+
+#+begin_quote
+~parse(input, options)~ is the main interface to the library. The ~input~
+parameter is a /string/, ~options~ must be an /object/ setting some of the
+options listed below. The return value will be an abstract syntax tree object as
+specified by the ESTree spec.
+— https://github.com/acornjs/acorn/tree/master/acorn
+#+end_quote
+
+#+begin_src javascript :noweb-ref parse
+function parse (input, options = {ecmaVersion: 2020}) {
+  return acorn.parse(input, options)
+};
+#+end_src
+
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/syntax.js :noweb yes
+const acorn = require("acorn")
+const walk = require("acorn-walk")
+const { generate } = require('astring')
+
+<<parse>>
+
+function ensureAST(source, options = {ecmaVersion: 2020}) {
+  return (typeof source === 'string') ? parse(source) : source;
+}
+
+module.exports = ensureAST
+module.exports.ensureAST = ensureAST;
+module.exports.parse = parse;
+module.exports.walk = walk;
+module.exports.generate = generate;
+
+#+end_src
+
+* ~gxc~ to compile Gerbil to Gambit
+
+ - *Gerbil* :: Written in Itself, The Macro is the Compiler
+
+Gerbil has a compiler which actually outputs [[file:gambit-loader.org][Gambit Scheme]] which has a compiler
+that can output *JavaScript*.
+
+So all we need to do is make it happen in a way that works with our loader, and
+there you go.
+
+** ~gxc~ help
+
+#+begin_src shell
+$ gxc
+gxc [options...] <file> ...
+Options:
+ -h,-help,--help             display this usage summary and exit
+ -d <dir>                    set compiler output directory; defaults to $GERBIL_HOME/lib
+ -exe                        compile an executable
+ -o <file>                   set executable output file
+ -O                          optimize gerbil source
+ -s                          keep intermediate .scm files
+ -S                          don't invoke gsc
+ -static                     compile modules for static linking; with -exe, compile a statically linked executable
+ -v                          be verbose during compilation
+ -g                          invoke gsc with -debug; enables -s
+ -genv                       invoke gsc with -debug-environments
+ -genv/phi                   invoke gsc with -debug-environments, including phi sections
+ -gsrc                       invoke gsc with -debug-environments -debug-source
+ -gsrc/phi                   invoke gsc with -debug-environments -debug-source, including phi sections
+ -no-ssxi                    don't generate .ssxi modules for cross-module optimization
+ -include-gambit-sharp       include _gambit# with necessary cond expand features
+ -prelude <sexpr>            add [-prelude <sexpr>] to gsc options
+ -cc-options <string>        add [-cc-options <string>] to gsc options
+ -ld-options <string>        add [-ld-options <string>] to gsc options
+ -gsc-flag   <opt>           add [<opt>] to gsc options
+ -gsc-option <opt> <string>  add [<opt> <string>] to gsc options
+
+
+#+end_src
+
+** ~gxc.js~
+#+begin_src javascript :tangle ../packages/gxjs-loader/gxc.js
+const pty = require('node-pty');
+const fs = require('fs');
+const path = require('path');
+const mktemp = require('mktmp');
+const which = require('which');
+const find = require('find');
+
+function spawn_gxc(cwd, callback, ...files) {
+  const gxc = which.sync('gxc');
+  const temp = mktemp.createDirSync('Gerbil-XXXX');
+  const args = ['-v', '-d', temp, '-s', '-S', ...files]
+  const names = files.map(f => path.basename(f, path.extname(f)));
+  const scmNames = names.map(name => `${name}__0.scm`)
+
+
+  var retval, outputs, error = false;
+  var ptyProcess = pty.spawn(gxc, args, {
+    name: 'xterm-color',
+    cols: 80,
+    rows: 30,
+    cwd: cwd,
+    env: process.env
+  });
+
+  let stdout = "";
+
+  // console.log('Running', cwd, '$', gxc, args.join(' '));
+  ptyProcess.on('data', function(data) {
+    // console.log(data);
+    stdout = stdout+data;
+  });
+
+  ptyProcess.on('exit', function(status) {
+    // console.log("gxc completed, ", status)
+    let error = false;
+
+    if (status !== 0) {
+      error = new Error(`GxJS compilation failed for ${gxc} ${args.join(' ')}\n\n ${stdout}`)
+    } else {
+      // If there's a package this file may be elsewhere so find it
+      const out = scmNames.map(x => find.fileSync(x, temp)[0]);
+      const _rep = /__0\.scm$/
+
+
+      // console.log("gxc completed, ", status)
+      // At this point the file we want to `gsc` is now in *___0.scm
+      // rename them! This makes `gsc` have the right module names`
+      outputs = out.map(o => o.replace(_rep, ".scm"));
+      out.map(path => fs.renameSync(path, path.replace(_rep, ".scm")))
+    };
+
+    // console.log("gxc completed, ", status)
+    callback({root: temp, status, error, args, files, names, outputs});
+  });
+
+  return ;
+
+
+}
+
+module.exports = spawn_gxc;
+
+
+#+end_src
+
+
+
+
+* ~gsc~ Try again, this time with ~node-pty~.
+:PROPERTIES:
+:CUSTOM_ID: GxJSGsc
+:END:
+
+At the first try I used ~unbuffer~, as ~gsc~, at least my version, only seems to
+output the error on an interactive console. Using spawnSync seemed to make it
+act that way, but it turns out that perhaps only ~gxc~ has the right terminal
+thingamabobs.
+
+This time we'll try https://www.npmjs.com/package/node-pty.
+
+"The full API for node-pty is contained within the [[https://github.com/microsoft/node-pty/blob/master/typings/node-pty.d.ts][TypeScript declaration file]],
+use the branch/tag picker in GitHub (w) to navigate to the correct version of
+the API." — https://github.com/microsoft/node-pty
+
+
+
+#+begin_src javascript :tangle ../packages/gxjs-loader/gsc.js
+const { execSync, execFileSync} = require("child_process");
+const pty = require('node-pty');
+const fs = require('fs');
+const path = require('path');
+const mktemp = require('mktmp');
+const which = require('which');
+const find = require('find');
+
+function spawn_gsc(opts, callback, ...files) {
+
+  const cwd = opts.cwd;
+  const gsc = which.sync('gsc');
+
+  const temp = mktemp.createDirSync('Gambit-XXXX');
+
+  const libdir = execSync("gxi -e '(print (car (library-load-path)))'",
+                         { encoding: 'utf8', shell: true})
+  const gxGambcSharp = find.fileSync('gx-gambc#.scm', libdir)[0];
+  const incGxGambcSharp = `(include "${gxGambcSharp}")`
+
+
+  const link = (l => l === undefined ? false : (l !== false))(opts.['-link']);
+  const outputType = link ? '-link' : '-c'
+  const linkChar = link ? '_' : '';
+
+  const args = ['-target', 'js',
+                '-prelude', '(include "~~lib/_gambit#.scm")',
+                '-repr-module', 'class',
+                '-namespace', '__GxJS_',
+                '-o', temp, outputType,
+                '-e', incGxGambcSharp,
+                ...files]
+
+  const names = files.map(f => path.basename(f, path.extname(f)));
+
+  let outputs = names.map(name => `${temp}/${name}${linkChar}.js`)
+  if (link) { outputs = [outputs[outputs.length - 1]]}
+
+
+
+  var ptyProcess = pty.spawn(gsc, args, {
+    name: 'xterm-color',
+    cols: 80,
+    rows: 30,
+    cwd: cwd,
+    env: process.env
+  });
+
+  let stdout = "";
+
+  console.log('Running', cwd, '$', gsc, args.join(' '));
+  ptyProcess.on('data', function(data) {
+    console.log(data); stdout = stdout+data;
+  });
+
+  ptyProcess.on('exit', function(status) {
+    let error = false;
+    if (status !== 0) {error =  new Error(`GxJS compilation failed for ${gsc} ${args.join(' ')}\n\n ${stdout}`) }
+    callback({root: temp, gsc, status, error, args, files, names, outputs})
+  });
+
+  return ;
+
+}
+
+module.exports = spawn_gsc;
+
+
+#+end_src
+
+* /File/ ~webpack.config.js~
+
+#+begin_src javascript :tangle "../packages/gxjs-loader/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  mode: 'development',
+  // mode: 'production',
+  entry: './gxjs-loader.js',
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: 'gxjs-loader.js',
+    library: 'GxJSLoader',
+    libraryTarget:'umd',
+  },
+  externals: {
+    'node-pty': {  commonjs2: 'node-pty', commonjs: 'node-pty' },
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({})],
+  },
+   module: {
+     rules: [
+       {
+         test: /\.js$/,
+         exclude: /(node_modules|bower_components)/,
+         use: {
+           loader: 'babel-loader',
+           options: {
+             comments: false,
+             presets: ['@babel/preset-env', 'minify'],
+             //plugins: [["minify-mangle-names", { topLevel: true } ]]
+         }
+        }
+       }
+    ]
+   },
+
+  target: 'node'
+};
+#+end_src

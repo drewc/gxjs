@@ -1,0 +1,106 @@
+#+TITLE: Gerbil Loader, 'cause ~gxc~ is our friend
+
+
+* Usage
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gerbil-loader-usage.ss
+package: foo
+
+(##inline-host-declaration "console.log('started gerbil loader!')")
+(def (this-is-gerbil!)
+  (##inline-host-statement "console.log('This is Gerbil!', (@1@))"
+                           (string-append "foo" "bar")))
+
+;; (error for incompelete form
+
+(##inline-host-statement "console.log('finished gerbil loader');
+ module.exports = RTS.scm2host(@1@);" this-is-gerbil!)
+#+end_src
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gerbil-loader.js
+const gerbil = require('gerbil-loader!./gerbil-loader-usage.ss')
+
+module.exports = gerbil;
+#+end_src
+
+#+begin_src shell
+cd ../gerbil-loader/ && yarn run webpack && du -h dist/* && cd - ; echo "TESTING"; echo; cd ../gxjs-tests/; yarn run webpack ; node -e "require ('./dist/main.js')"
+#+end_src
+*  ~gerbil-loader.js~
+
+#+begin_src javascript :tangle ../packages/gerbil-loader/gerbil-loader.js
+const { loadGxJS } = require('gxjs-loader')
+const path = require('path');
+function gerbilLoader () {
+  const callback = this.async()
+  const rpath = this.resourcePath
+  const options = this.getOptions();
+
+  options.gxc = ((o) => o === undefined ? true : o === '' ? true : o)(options.gxc);
+  const cwd = path.dirname(this.resourcePath);
+
+  const RTSrequire = (req => req === undefined ? 'gerbil-scheme' : req)(options['RTS']);
+  options.RTS = RTSrequire;
+
+  const devVerbose = this.mode === 'development'
+  const verbose = ((v) => v === undefined ? devVerbose : v)(options['-verbose']);
+  options['-v'] = verbose
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+
+  log("Loading Gerbil Scheme using gerbil-loader: ", rpath, options)
+
+  loadGxJS(options, rpath, callback);
+
+
+
+}
+
+module.exports = gLoader
+
+
+#+end_src
+
+* /File/ ~webpack.config.js~
+
+#+begin_src javascript :tangle "../packages/gerbil-loader/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  // mode: 'development',
+  mode: 'production',
+  entry: './gerbil-loader.js',
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: 'gerbil-loader.js',
+    library: 'GerbilLoader',
+    libraryTarget:'umd',
+  },
+  externals: {
+    'gxjs-loader': {  commonjs2: 'gxjs-loader', commonjs: 'gxjs-loader' }
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({})],
+  },
+   module: {
+     rules: [
+       {
+         test: /\.js$/,
+         exclude: /(node_modules|bower_components)/,
+         use: {
+           loader: 'babel-loader',
+           options: {
+             comments: false,
+             presets: ['@babel/preset-env', 'minify'],
+             //plugins: [["minify-mangle-names", { topLevel: true } ]]
+         }
+        }
+       }
+    ]
+   },
+
+  target: 'node'
+};
+#+end_src

@@ -1,0 +1,442 @@
+#+TITLE: Gerbil Scheme: A meta-dialect, and runtime
+
+Gerbil is a meta-dialect of Scheme with post-modern features. It transpiles to
+[[file:gambit-scheme.org][Gambit]] which can transpile to *Javascript*.
+
+
+#+begin_src shell
+cd packages/ ; mkdir gerbil-scheme/ ; cd gerbil-scheme; yarn init
+yarn run lerna add gxjs-loader packages/gerbil-scheme --dev
+yarn run lerna add gambit-scheme packages/gerbil-scheme
+#+end_src
+
+#+begin_src javascript :tangle ../packages/gerbil-scheme/index.js
+const RTS = require('gambit-scheme')
+const GxJSGambJS = require('gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./gxjs-gambjs.scm');
+
+GxJSGambJS(RTS);
+module.exports = RTS;
+
+#+end_src
+
+
+* ~gx-gambc*.scm~, the *Gerbil* bootstrap in *Gambit*
+
+Primarily, *Gerbil* is implemented in itself. However, to start with, it must be
+built from thin air.
+
+Well, actually, *Gambit* is a thick air, with loads of features. However we only
+need a base to build on. Here it goes.
+
+** Contents
+
+In Gerbil itself, right now, there are a few files that make up the runtime.
+
+ - [[#gxGambcSharp][~gx-gambc#.scm~, the macros included for all]]
+
+*** Testing it out
+#+begin_src scheme :tangle ../packages/gxjs-tests/test-gx-gambc.ss :noweb yes
+(def (test> name i pred j)
+  (let ((res (pred i j)))
+    (##inline-host-statement "
+     (() => {
+      function hst (thing) { return thing
+         // try { return RTS.scm2host(thing) } catch { return thing } ;
+     };
+     const name = hst(@1@);
+     const i = hst(@2@);
+     const j = hst(@3@);
+     const res = !!(@4@);
+     const msg = name + ' ' + JSON.stringify(i) + ' => ' + JSON.stringify(j);
+     if (res) {
+       console.log('Success:', msg)
+     } else {
+       console.error('Failure', msg)
+     }
+   })()
+
+" name i j res)))
+
+(##inline-host-declaration "console.log('loading gx-gambjs ests')")
+(##inline-host-statement "console.log('loaded gx-gamjs testes')")
+
+<<test-gxGambcSharp>>
+
+<<test-base-atoms>>
+
+<<test-hash-table>>
+
+<<test-keyword-dispatch>>
+
+(def (test-gx-gambc)
+  (test-gx-gambc#)
+  (test-base-atoms)
+  (test-hash-table)
+  (test-keyword-dispatch))
+
+(##inline-host-statement "module.exports = RTS.scm2host(@1@)" test-gx-gambc)
+#+end_src
+
+** ~gx-gambc#.scm~, the macros included for all.
+:PROPERTIES:
+:CUSTOM_ID: gxGambcSharp
+:END:
+
+The ~gerbil-loader~ calls ~gsc~ with these macro [[file:gerbil-loader.org::#GxGsc][always included]]. They are all
+in the ~("")~ AKA ~#f~ namespace.
+
+- ;;; shims to ensure inlining of low level primitives
+- ;; conditional evaluation
+
+
+#+begin_src scheme :noweb-ref test-gxGambcSharp
+(declare (extended-bindings))
+(extern namespace: #f
+  ;;; shims to ensure inlining of low level primitives
+  %%apply
+
+;; when and unless
+
+
+  )
+
+(def whereami #t)
+
+
+(def (bar) (if whereami 42 43))
+
+(def (test-when)
+  (let ((n (when whereami 2)))
+    (##inline-host-statement "console.log('WTF Gambc?', (@1@))" n)
+    n))
+
+(def (test-unless) (unless test-when 42))
+
+(def (test-gx-gambc#)
+  (test> "%%apply" (car (##apply list '(1 2))) ##fx= 1)
+  ;;(test> "%%apply" (list whereami 1) ##fx= 1)
+  (test> "when" (test-when) ##fx= 2)
+  (test> "unless" (test-unless) eq? (void))
+
+
+  42)
+
+
+
+#+end_src
+
+
+** ~gx-gambc0~, the first runtime stage.
+
+*** Base Atoms: absent, void, true, false, void, eof
+
+#+begin_src scheme :noweb-ref base-atoms
+(define absent-obj
+  (macro-absent-obj))
+
+(define absent-value
+  '#(#!void))
+
+(define (true . _)
+  #t)
+(define (true? obj)
+  (eq? obj #t))
+
+(define (false . _)
+  #f)
+
+(define (void . _)
+  #!void)
+(define (void? obj)
+  (eq? obj #!void))
+
+(define (eof-object . _)
+  '#!eof)
+
+(define (identity obj)
+  obj)
+#+end_src
+
+#+begin_src scheme :noweb-ref test-base-atoms
+(def (test-base-atoms)
+  (test> "void?" (void? (void)) eq? #t))
+#+end_src
+
+*** Hash to burn, ~hash-table~'s to roll.
+
+Hash tables are a big one.
+
+#+begin_src scheme :noweb-ref test-hash-table
+
+(def (ok-hash!)
+  (let ((eq-ht (make-hash-table-eq)))
+    (hash-table? eq-ht))
+  )
+
+(def (test-hash-table)
+  (let ((eq-ht (make-hash-table-eq)))
+    (##inline-host-statement "console.log('testing hash tables', (@1@))" (ok-hash!))
+    (test> "hash-table?" (hash-table? eq-ht) eq? #t)))
+
+
+#+end_src
+
+#+begin_src scheme :noweb-ref hash-tables
+(define make-hash-table make-table)
+(define (make-hash-table-eq . args)
+  (apply make-table test: eq? args))
+(define (make-hash-table-eqv . args)
+  (apply make-table test: eqv? args))
+
+(define list->hash-table list->table)
+(define (list->hash-table-eq lst . args)
+  (apply list->table lst test: eq? args))
+(define (list->hash-table-eqv lst . args)
+  (apply list->table lst test: eqv? args))
+
+(define hash?
+  table?)
+(define hash-table?
+  table?)
+
+(define hash-length
+  table-length)
+(define hash-ref
+  table-ref)
+(define (hash-get ht k)
+  (table-ref ht k #f))
+(define (hash-put! ht k v)
+  (table-set! ht k v))
+(define (hash-update! ht k update #!optional (default #!void))
+  (let ((value (hash-ref ht k default)))
+    (hash-put! ht k (update value))))
+
+(define (hash-remove! ht k)
+  (table-set! ht k))
+
+(define hash->list
+  table->list)
+
+(define (hash->plist ht)
+  (hash-fold cons* '() ht))
+
+(define (plist->hash-table plst #!optional (ht (make-hash-table)))
+  (let lp ((rest plst))
+    (core-match rest
+      ((k v . rest)
+       (hash-put! ht k v)
+       (lp rest))
+      (() ht))))
+
+(define (plist->hash-table-eq plst)
+  (plist->hash-table plst (make-hash-table-eq)))
+(define (plist->hash-table-eqv plst)
+  (plist->hash-table plst (make-hash-table-eqv)))
+
+(define (hash-key? ht k)
+  (not (eq? (hash-ref ht k absent-value) absent-value)))
+
+(define hash-for-each
+  table-for-each)
+
+(define (hash-map fun ht)
+  (hash-fold
+   (lambda (k v r) (cons (fun k v) r))
+   '() ht))
+
+(define (hash-fold fun iv ht)
+  (let ((ret iv))
+    (hash-for-each
+     (lambda (k v) (set! ret (fun k v ret)))
+     ht)
+    ret))
+
+(define hash-find
+  table-search)
+
+(define (hash-keys ht)
+  (hash-map (lambda (k v) k) ht))
+
+(define (hash-values ht)
+  (hash-map (lambda (k v) v) ht))
+
+(define (hash-copy hd . rest)
+  (let ((hd (table-copy hd)))
+    (if (null? rest) hd
+        (apply hash-copy! hd rest))))
+
+(define (hash-copy! hd . rest)
+  (for-each (lambda (r) (table-merge! hd r)) rest)
+  hd)
+
+(define (hash-merge hd . rest)
+  (foldl (lambda (tab r) (table-merge r tab))
+         hd rest))
+
+(define (hash-merge! hd . rest)
+  (foldl (lambda (tab r) (table-merge! r tab))
+         hd rest))
+
+(define (hash-clear! ht #!optional (size 0))
+  (let ((gcht (%%vector-ref ht 5)))
+    (if (not (fixnum? gcht))
+      (%%vector-set! ht 5 size))))
+
+#+end_src
+
+
+*** ~keyword-dispatch~, almost the whole point
+
+We are trying to keep things very minimal (before we write a code walker/tree
+shaker/custom linker) as we do not want to require a load of ~kb~'s just to
+start.
+
+But I really like *Gerbil*'s ~def~ form, and the keywords that go with it.
+
+To make it happen there's a function. If passed a table of keywords it only
+dispatches on those. Otherwise it does them all.
+
+#+begin_src scheme test-kw-false
+
+#+end_src
+
+#+begin_src scheme :noweb-ref test-keyword-dispatch
+(def (test-keyword-dispatch)
+  (def (kwfn table . args)
+    (test> "kw hash?" (hash-table? table) eq? #t)
+    (test> "kw args" (car args) ##fx= 42)
+    (hash-ref table dispatch:))
+  (let ((kw (keyword-dispatch #f kwfn dispatch: 'yup 42 1 2 3)))
+    (test> "dispatch" kw eq? 'yup)))
+#+end_src
+
+#+begin_src scheme :noweb-ref keyword-dispatch
+;; kwt: #f or a vector as a perfect hash-table for expected keywords
+(define (keyword-dispatch kwt K . all-args)
+  (when kwt
+    (unless (vector? kwt)
+      (##raise-type-exception 1 'vector 'keyword-dispatch
+                              (cons* kwt K all-args))))
+  (unless (procedure? K)
+    (##raise-type-exception 2 'procedure 'keyword-dispatch
+                            (cons* kwt K all-args)))
+  (let ((keys (make-hash-table-eq hash: keyword-hash)))
+    (let lp ((rest all-args) (args #f) (tail #f))
+      (core-match rest
+        ((hd . hd-rest)
+         (cond
+          ((keyword? hd)
+           (core-match hd-rest
+             ((val . rest)
+              (when kwt
+                (let ((pos (%%fxmodulo (keyword-hash hd) (%%vector-length kwt))))
+                  (unless (eq? hd (%%vector-ref kwt pos))
+                    (error "Unexpected keyword argument" K hd))))
+              (when (hash-key? keys hd)
+                (error "Duplicate keyword argument" K hd))
+              (hash-put! keys hd val)
+              (lp rest args tail))))
+          ((eq? hd #!key)               ; keyword escape
+           (core-match hd-rest
+             ((val . rest)
+              (if args
+                (begin
+                  (%%set-cdr! tail hd-rest)
+                  (lp rest args hd-rest))
+                (lp rest hd-rest hd-rest)))))
+          ((eq? hd #!rest)              ; end keyword processing
+           (if args
+             (begin
+               (%%set-cdr! tail hd-rest)
+               (%%apply K (cons keys args)))
+             (%%apply K (cons keys hd-rest))))
+          (else                         ; plain argument
+           (if args
+             (begin
+               (%%set-cdr! tail rest)
+               (lp hd-rest args rest))
+             (lp hd-rest rest rest)))))
+        (else
+         (if args
+           (begin
+             (%%set-cdr! tail '())
+             (%%apply K (cons keys args)))
+           (K keys)))))))
+
+#+end_src
+
+** /File/ ~gxjs-gambjs.scm~
+
+
+#+begin_src scheme :tangle ../packages/gerbil-scheme/gxjs-gambjs.scm :noweb yes
+;;; -*- Gerbil -*-
+;;; (C) me at drewc.ca
+;;; (C) vyzo at hackzen.org
+
+;;; Gerbil stage0 -- Gambit-JS host runtime
+
+(##namespace (""))
+;;(include "gx-gambc#.scm")
+
+(declare
+  (block)
+  (standard-bindings)
+  (extended-bindings))
+
+<<base-atoms>>
+
+<<hash-tables>>
+
+<<keyword-dispatch>>
+
+(##inline-host-statement "console.log('gambjs-runtime')")
+#+end_src
+
+
+
+* /File/ ~webpack.config.js~
+
+#+begin_src javascript :tangle "../packages/gerbil-scheme/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  // mode: 'development',
+  mode: 'production',
+  entry: { 'gerbil-scheme': './index.js' },
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: '[name].js',
+    library: 'gerbilScheme',
+    libraryTarget: 'umd',
+    globalObject: 'this'
+  },
+  externals: {
+    'gambit-scheme': { commonjs2: 'gambit-scheme',commonjs: 'gambit-scheme' }
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({})],
+  },
+   module: {
+     rules: [
+       {
+         test: /\.js$/,
+         exclude: /(node_modules|bower_components)/,
+         use: {
+           loader: 'babel-loader',
+           options: {
+             comments: false,
+             presets: ['@babel/preset-env', 'minify'],
+             //plugins: [["minify-mangle-names", { topLevel: true } ]]
+         }
+        }
+       }
+    ]
+   },
+};
+#+end_src

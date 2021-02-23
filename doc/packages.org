@@ -1,0 +1,237 @@
+#+TITLE: Packages: NPM, Yarn, Whatever they are, we have them.
+
+I think my first package is ready.
+
+* Test it independently
+
+The packages is a part of a monorepo and we do not want to test it there. So create a test directory and make it a package.
+
+#+begin_src shell
+mkdir /tmp/test-directory; cd /tmp/test-directory ; yarn init -yp
+#+end_src
+
+The first package I want to make live is ~gxjs-loader~.
+
+#+begin_src shell
+yarn link "gxjs-loader"
+yarn add link:gxjs-loader
+#+end_src
+
+For testing it expects a runtime package ~gxjs~.
+
+#+begin_src shell
+yarn link "gxjs"
+yarn add link:gxjs
+#+end_src
+
+Now a simple webpack.
+
+#+begin_src shell
+yarn add webpack webpack-cli
+#+end_src
+
+#+begin_src javascript :tangle "/tmp/test-directory/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  mode: 'development',
+  entry: './index.js',
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: '[name].js',
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
+  },
+};
+#+end_src
+
+Make the ~index.js~ out of a Gerbil file.
+
+First Gerbil.
+
+#+begin_src scheme :tangle "/tmp/test-directory/index.ss"
+(import :js)
+
+(def test-jso { number: 42 string: "js string!" })
+
+(js#declaration "console.log('Testing Test Dir')")
+
+(def (test-jso? (jso test-jso))
+  (let* ((js-jso (if (foreign? jso) (js#scm->js jso) jso))
+         (n? (js#expression "(@1@).number === 42" js-jso))
+         (s? (js#expression "(@1@).string === 'js string!'" js-jso)))
+
+    (js#statement "console.log('jso', (@1@), 'n?', (@2@), 's?', (@3@))"
+                  jso n? s?)))
+(js#statement "module.exports = @1@;" (js#scm->js test-jso?))
+#+end_src
+
+Now JS.
+
+#+begin_src javascript :tangle "/tmp/test-directory/first-index.js"
+const testJSO = require('gxjs-loader!./index.ss')
+
+console.log('loaded index.ss', testJSO);
+testJSO();
+testJSO( { number: 666, string: "P&T FU!" } );
+#+end_src
+
+Webpack the thing.
+
+#+begin_src shell
+yarn run webpack && node --trace-uncaught -e "require ('./dist/main.js')"
+#+end_src
+
+It seems to work!!
+
+* Publishing
+
+First login to NPM
+
+#+begin_src shell
+yarn login
+#+end_src
+
+Now publish it!
+
+#+begin_src shell
+cd gxjs-loader;
+
+yarn publish
+
+yarn publish v1.22.5
+[1/4] Bumping version...
+info Current version: 0.0.0
+question New version: 0.0.1
+info New version: 0.0.1
+[2/4] Logging in...
+info npm username: drewc
+info npm email: me@drewc.ca
+question npm password:
+success Logged in.
+[3/4] Publishing...
+success Published.
+[4/4] Revoking token...
+success Revoked login token.
+Done in 20.51s.
+
+#+end_src
+
+Did it work?
+
+#+begin_src shell
+yarn info gxjs-loader
+#+end_src
+
+
+Seems to! Let's test it on it's own.
+
+
+#+begin_src scheme :tangle /tmp/test-directory/runtime.scm
+(namespace (""))
+(##declare
+  (multilisp)
+  (extended-bindings)
+  (not safe)
+  (block)
+  (inlining-limit 134)
+  ;(not run-time-bindings)
+;  (standard-bindings)
+)
+
+(##inline-host-statement #<<EOF
+RTS.module_register = function(module_descr) {
+  const r = this;
+  r.sp = -1;
+  r.stack[++this.sp] = void 0;
+  r.r0 = this.underflow;
+  r.nargs = 0;
+  r.trampoline(module_descr[4]);
+};
+
+EOF
+)
+(define (##apply proc arg1 . rest)
+  (declare (not inline))
+  (if (##pair? rest)
+
+    (let loop ((prev arg1) (lst rest))
+      (let ((temp (##car lst)))
+        (##set-car! lst prev)
+        (let ((tail (##cdr lst)))
+          (if (##pair? tail)
+            (loop temp tail)
+            (begin
+              (##set-cdr! lst temp)
+              (##apply proc rest))))))
+
+    (##apply proc arg1)))
+
+(define-prim (apply proc arg1 . rest)
+  (if (##pair? rest)
+    (##apply ##apply proc (cons arg1 rest))
+    (##apply proc arg1)))
+
+(define-prim (##length lst)
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (let loop ((x lst) (n 0))
+    (if (pair? x)
+        (loop (cdr x) (fx+ n 1))
+        n)))
+#+end_src
+
+Now make a runtime with it.
+
+#+begin_src javascript :tangle /tmp/test-directory/runtime.js
+const RTS = require('gxjs-loader?-link&return=RTS&exports!./runtime.scm');
+const RunTime = require('gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./runtime.scm');
+
+RunTime(RTS);
+console.log('New RTS:', RTS.glo, RunTime)
+
+module.exports = RTS;
+#+end_src
+
+A file that uses a runtime
+
+#+begin_src scheme :tangle "/tmp/test-directory/new-index.ss"
+(import :js)
+
+(def test-jso (js#expression "{ number: 42,  string: 'js string!'};"))
+
+(js#declaration "console.log('Testing Test Dir')")
+
+(def (test-jso? (jso test-jso))
+  (let* ((js-jso jso)
+         (n? (js#expression "(@1@).number === 42" js-jso))
+         (s? (js#expression "(@1@).string === 'js string!'" js-jso)))
+
+    (js#statement "console.log('jso', (@1@), 'n?', (@2@), 's?', (@3@))"
+                  jso n? s?)))
+(js#statement "module.exports = RTS.scm2host(@1@);" test-jso?)
+#+end_src
+And the ~index.js~
+
+
+#+begin_src javascript :tangle "/tmp/test-directory/index.js"
+const testJSO = require('gxjs-loader?RTS=./runtime.js!./new-index.ss')
+
+console.log('loaded index.ss', testJSO);
+testJSO();
+testJSO( { number: 666, string: "P&T FU!" } );
+#+end_src
+
+Webpack the thing.
+
+#+begin_src shell
+yarn unlink "gxjs-loader"
+yarn remove "gxjs-loader"
+
+yard add gxjs-loader
+yarn run webpack && node --trace-uncaught -e "require ('./dist/main.js')"
+#+end_src

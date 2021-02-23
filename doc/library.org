@@ -1,0 +1,96 @@
+#+TITLE: GxJS Library
+
+
+Essenially the entire reason behind *GxJS* is to be able to use *Gerbil* and
+*Gambit* through JavaScript code.
+
+* ~gxjs.js~, the heart and soul
+
+This is where the library comes together. All the scheme work to be able to
+import in a JS file :)
+
+#+begin_src javascript :tangle "../gxjs-es6.js"
+// First the link file.
+import RTS from 'gxjs-module!gxjs-lex!gsc?link&l=gambit%2Funiv!./gambit/univ/rts.scm'
+import loadRTS from 'gxjs-module!gxjs-arrow?args=["RTS"]!gxjs-var!gxjs-min!gsc!./gambit/univ/rts.scm'
+import loadUniv from 'gxjs-module!gxjs-arrow?args=["RTS"]!gxjs-var!gxjs-min!gsc!./gambit/univ.scm'
+
+
+loadRTS(RTS);
+loadUniv(RTS);
+
+export { RTS, loadRTS, loadUniv };
+export default RTS;
+#+end_src
+
+#+begin_src javascript :tangle "../gxjs.js"
+const RTS = require('./gxjs-univ.js')
+const Lazy = require('./lazy.js')
+//import RTS from '/gxjs-univ'
+// export { default } from './gxjs-univ.js'
+
+console.log("gxjs have RTS?", RTS)
+console.log("gxjs have lazy?", Lazy)
+
+Lazy(RTS);
+
+module.exports = RTS
+#+end_src
+#+begin_src javascript :tangle "../gxjs-common.js"
+const RTS = require('gxjs-module!gxjs-lex!gsc?link&l=gambit%2Funiv!./gambit/univ/rts.scm')
+const loadRTS = require('gxjs-module!gxjs-arrow?args=["RTS"]!gxjs-var!gxjs-min!gsc!./gambit/univ/rts.scm')
+const loadUniv = require ('gxjs-module!gxjs-arrow?args=["RTS"]!gxjs-var!gxjs-min!gsc!./gambit/univ.scm');
+
+loadRTS(RTS);
+loadUniv(RTS);
+
+console.log("gxjs have RTS?", RTS)
+module.exports = RTS
+#+end_src
+
+
+#+begin_src javascript :tangle ../index.js
+import _ from 'lodash';
+import numRef from './ref.json';
+
+export function numToWord(num) {
+  return _.reduce(numRef, (accum, ref) => {
+    return ref.num === num ? ref.word : accum;
+  }, '');
+}
+
+export function wordToNum(word) {
+  return _.reduce(numRef, (accum, ref) => {
+    return ref.word === word && word.toLowerCase() ? ref.num : accum;
+  }, -1);
+}
+
+#+end_src
+#+begin_src javascript :tangle ../ref.json
+[
+  {
+    "num": 1,
+    "word": "One"
+  },
+  {
+    "num": 2,
+    "word": "Two"
+  },
+  {
+    "num": 3,
+    "word": "Three"
+  },
+  {
+    "num": 4,
+    "word": "Four"
+  },
+  {
+    "num": 5,
+    "word": "Five"
+  },
+  {
+    "num": 0,
+    "word": "Zero"
+  }
+]
+#+end_src

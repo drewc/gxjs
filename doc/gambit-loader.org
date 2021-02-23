@@ -1,0 +1,101 @@
+#+TITLE: Gambit Loader: Loading ~.scm~ files to JavaScript
+
+*Gambit Scheme* is what we base our meta-dialect off of, and ~gxjs-loader~ takes care of loading a gambit scheme file using the ~gambit-scheme~ runtime.
+
+
+* /File/ ~gambit-loader.js~
+
+
+#+begin_src javascript :tangle ../packages/gambit-loader/gambit-loader.js
+const { loadGxJS } = require('gxjs-loader')
+const path = require('path');
+function gambitLoader () {
+  const callback = this.async()
+  const rpath = this.resourcePath
+  const options = this.getOptions();
+
+  options.gxc = false;
+  const cwd = path.dirname(this.resourcePath);
+
+  const RTSrequire = (req => req === undefined ? 'gambit-scheme' : req)(options['RTS']);
+  options.RTS = RTSrequire;
+
+  const devVerbose = this.mode === 'development'
+  const verbose = ((v) => v === undefined ? devVerbose : v)(options['-v']);
+  options['-v'] = verbose
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+
+  log("Loading Gambit Scheme using gambit-loader: ", rpath, options)
+
+  loadGxJS(options, rpath, callback);
+
+
+
+}
+
+module.exports = gambitLoader
+#+end_src
+
+* /File/ ~webpack.config.js~
+
+#+begin_src shell
+cd ../gambit-loader/ && yarn run webpack && du -h dist/* && cd - ; cd ../gxjs-tests/; yarn run webpack ; node -e "require ('./dist/main.js')"
+#+end_src
+#+begin_src javascript :tangle "../packages/gambit-loader/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  mode: 'development',
+ // mode: 'production',
+  entry: './gambit-loader.js',
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: 'gambit-loader.js',
+    library: 'GambitLoader',
+    libraryTarget:'umd',
+  },
+  externals: {
+    'gxjs-loader': {  commonjs2: 'gxjs-loader', commonjs: 'gxjs-loader' }
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({})],
+  },
+   module: {
+     rules: [
+       {
+         test: /\.js$/,
+         exclude: /(node_modules|bower_components)/,
+         use: {
+           loader: 'babel-loader',
+           options: {
+             comments: false,
+             presets: ['@babel/preset-env', 'minify'],
+             //plugins: [["minify-mangle-names", { topLevel: true } ]]
+         }
+        }
+       }
+    ]
+   },
+
+  target: 'node'
+};
+#+end_src
+
+* /File/ ~package.json~
+#+begin_src json :tangle ../packages/gambit-loader/package.json
+{
+  "name": "gambit-loader",
+  "version": "0.1.1",
+  "description": "Gambit Scheme to JavaScript loader",
+  "main": "dist/gambit-loader.js",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "MIT"
+}
+#+end_src

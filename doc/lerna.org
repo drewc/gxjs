@@ -1,0 +1,41 @@
+#+TITLE: Lerna: A tool for managing JavaScript projects with multiple packages
+
+
+* Intro
+
+*GxJS* has very much been about learning how the *JavaScript* community works.
+It seems components are divided up into packages. Those packages are described
+by a ~package.json~ file.
+
+That file is uploaded and the package published to the *npm registry*. That way
+it can be used trivially by other packages, in my case mostly as modules.
+
+However, it does seem the default is to have a single *git* repo for every
+package. That seems like a headache. As I was investigating that direction I
+discovered *Lerna*.
+
+Here are some useful docs.
+
+ - https://docs.npmjs.com/about-packages-and-modules
+
+* Installation
+
+#+begin_src shell
+
+# Add Lerna as a dev dependency
+
+yarn add lerna --dev
+
+# init learna!
+
+yarn run lerna init
+
+# yarn run v1.22.5
+# $ /home/drewc/me/src/gxjs/node_modules/.bin/lerna init
+# lerna notice cli v3.22.1
+# lerna info Updating package.json
+# lerna info Creating lerna.json
+# lerna info Creating packages directory
+# lerna success Initialized Lerna files
+# Done in 0.58s.
+#+end_src

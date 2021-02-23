@@ -1,0 +1,117 @@
+#+TITLE: Gambit Scheme: a full implementation of the Scheme language
+
+Here's the idea: A minimal import that allows a near full Gambit runtime
+environment.
+
+#+begin_src shell
+cd packages/ ; mkdir gambit-scheme/ ; cd gambit-scheme; yarn init
+# yarn init v1.22.5
+# question name (gambit-scheme):
+# question version (1.0.0): 0.0.0
+# question description: Gambit Scheme Runtime and Environment
+# question entry point (index.js):
+# question repository url: git@github.com:drewc/gxjs.git
+# question author: Drew Crampsie <me@drewc.ca>
+# question license (MIT): Apache-2.0
+# question private: false
+# success Saved package.json
+
+yarn run lerna add gambit-loader
+#+end_src
+
+* The Minimal Universal Runtime: TMUR!
+
+[[file:universal.org::*Introduction][We've got a minimal runtime]]. I figure we can use it and add only the needed
+parts here.
+
+* Make a few Prims "exteral"
+
+#+begin_src scheme :tangle ../packages/gambit-scheme/prims.scm
+(declare (extended-bindings))
+(namespace (""))
+
+(define-prim (foreign? obj) (##foreign? obj))
+
+;;; (##inline-host-declaration "console.log('Success declare for prims.scm!!')")
+;;; (##inline-host-statement "console.log('Success statement for prims.scm!!')")
+#+end_src
+
+* ~gambit-scheme.js~
+
+#+begin_src javascript :tangle ../packages/gambit-scheme/gambit-scheme.js
+const RTS = require('./runtime.js');
+
+const prims = require('gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./prims.scm');
+
+prims(RTS);
+
+module.exports = RTS;
+#+end_src
+
+
+
+
+* /File/ ~webpack.config.js~
+
+#+begin_src javascript :tangle "../packages/gambit-scheme/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  // mode: 'development',
+  mode: 'production',
+  entry: { 'gambit-scheme': './gambit-scheme.js' },
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: '[name].js',
+    library: 'gambitScheme',
+    libraryTarget: 'umd',
+    globalObject: 'this'
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({})],
+  },
+    module: {
+      rules: [
+        {
+          test: /\.js$/,
+          exclude: /(node_modules|bower_components)/,
+          use: {
+            loader: 'babel-loader',
+            options: {
+              comments: false,
+              presets: ['@babel/preset-env', 'minify'],
+              //plugins: [["minify-mangle-names", { topLevel: true } ]]
+          }
+         }
+        }
+     ]
+    },
+};
+#+end_src
+
+
+* /File/ ~webpack.test.js~
+
+#+begin_src javascript :tangle "../packages/gambit-scheme/webpack.test.js"
+const path = require('path');
+
+module.exports = {
+  mode: 'development',
+  target: 'web',
+  entry: './test/index.js',
+  output: {
+    path: path.resolve(__dirname, './test/dist'),
+    filename: 'test.js',
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
+  },
+};
+#+end_src

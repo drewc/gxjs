@@ -1,0 +1,148 @@
+#+TITLE: Usage Driven Tests : Development Driven Testing
+
+
+#+begin_src shell
+cd ../packages/ ; mkdir gxjs-tests/ ; cd gxjs-tests; yarn init
+# yarn init v1.22.5
+# question name (gambit-scheme):
+# question version (1.0.0): 0.0.0
+# question description: Gambit Scheme Runtime and Environment
+# question entry point (index.js):
+# question repository url: git@github.com:drewc/gxjs.git
+# question author: Drew Crampsie <me@drewc.ca>
+# question license (MIT): Apache-2.0
+# success Saved package.json
+
+yarn run lerna add gambit-scheme packages/gxjs-tests
+yarn run lerna add gambit-loader packages/gxjs-tests
+yarn run lerna add gerbil-loader packages/gxjs-tests
+yarn run lerna add gerbil-scheme packages/gxjs-tests
+yarn run lerna add gxjs packages/gxjs-tests
+yarn run lerna add gxjs-loader packages/gxjs-tests
+#+end_src
+
+
+#+begin_src javascript :tangle "../packages/gxjs-tests/index.js"
+const RTS = require('gambit-scheme')
+
+globalThis.gambitRTS = RTS;
+console.log("Have RTS?:", typeof RTS === 'function');
+
+const testUniversal = require('gambit-loader!./universal.scm')
+
+console.log("Loaded universal.scm", testUniversal);
+
+testUniversal()
+
+const sameRTS = require('gerbil-scheme')
+
+console.log("Have same RTS?:", RTS === sameRTS);
+
+const testGerbilLoader = require('./gerbil-loader.js');
+
+testGerbilLoader();
+
+const testGerbilGambc = require('gerbil-loader!./test-gx-gambc.ss')
+
+testGerbilGambc();
+
+// const GxJSRTS = require ('gxjs')
+// console.log("Have same GxJS = RTS?:", RTS === GxJSRTS);
+
+// const testGxJS = require('gerbil-loader!./test-gxjs.ss')
+
+// testGxJS();
+
+
+// const GxJSLoader = require('./gxjs-loader.js')
+
+// GxJSLoader();
+
+// const gambitGxJSLoader = require('./gxjs-gambit-loader.js')
+
+// gambitGxJSLoader(1024);
+
+// const diffRTS = require('./gxjs-link-loader.js')
+
+// const answer = require('./gxjs-link-use-runtime.js')
+
+// console.log( 'Life? Universe? everything?', answer);
+// const failure = require('gxjs-loader!./fail-gsc.ss')
+
+module.exports = RTS
+
+#+end_src
+
+* Testing ~gsc~ error output
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/fail-gsc.ss
+(##inline-host-statement "(@1@)")
+#+end_src
+
+#+begin_src shell
+cd ../packages/gxjs-tests ; yarn run webpack
+
+cd ../gxjs-tests/ ; yarn run webpack ; node -e "require ('./dist/main.js')"; yarn run webpack serve
+#+end_src
+
+#+begin_src html :tangle "../packages/gxjs-tests/dist/index.html"
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Universal Backed Prims</title>
+
+    <meta charset="utf-8">
+    <meta name="description" content="GxJS testing">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+
+  </head>
+  <body>
+    <div id="q-app"> Check the JS console.</div>
+  <!-- <script src="../gxjs.js"></script> -->
+  <!-- <script>console.log('GxJS', GxJS)</script> -->
+   <script src="main.js"></script>
+  <!-- <script src="univ-test.js"></script></body> <\!--  -\-> -->
+</html>
+#+end_src
+
+* /File/ ~webpack.config.js~
+
+#+begin_src javascript :tangle "../packages/gxjs-tests/webpack.config.js"
+const TerserPlugin = require("terser-webpack-plugin");
+const path = require('path');
+
+module.exports = {
+  mode: 'development',
+  entry: './index.js',
+  output: {
+    path: path.resolve(__dirname, './dist'),
+    filename: '[name].js',
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({})],
+  },
+   // module: {
+   //   rules: [
+   //     {
+   //       test: /\.js$/,
+   //       exclude: /(node_modules|bower_components)/,
+   //       use: {
+   //         loader: 'babel-loader',
+   //         options: {
+   //           comments: false,
+   //           presets: ['@babel/preset-env', 'minify'],
+   //           //plugins: [["minify-mangle-names", { topLevel: true } ]]
+   //       }
+   //      }
+   //     }
+   //  ]
+   // },
+};
+#+end_src
