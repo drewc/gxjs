@@ -1,0 +1,13 @@
+{
+  "name": "gambit-scheme",
+  "version": "0.0.0",
+  "description": "Gambit Scheme Runtime and Environment",
+  "main": "dist/gambit-scheme.js",
+  "files": ["dist/", "README.md"],
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "gxjs-loader": "^0.0.4"
+  }
+}

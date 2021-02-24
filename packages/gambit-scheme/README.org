@@ -1,0 +1,36 @@
+#+TITLE: Gambit Scheme : Universal Runtime for Scheme
+#+OPTIONS: toc:nil
+
+
+*Gambit Scheme*
+
+The Gambit programming system is a full implementation of the Scheme language
+which conforms to the R4RS, R5RS and IEEE Scheme standards.
+
+The ~gambit-scheme~ UMD library allows many different uses of that runtime.
+
+* Installation
+
+Easy! I choose ~yarn~, but ~npm~ also works.
+
+#+begin_src shell
+yarn add gambit-scheme
+#+end_src
+
+One probably wants to load ~.scm~ files. For that ~gambit-loader~ is one option.
+
+#+begin_src shell
+yarn add gambit-loader --dev
+#+end_src
+
+* Documentation
+
+For details see the repo, man! https://github.com/drewc/gxjs
+
+* Usage
+
+#+INCLUDE: "../../doc/gambit-scheme.org::#GambitSchemeUsage" :only-contents t
+
+* Support
+
+Go to https://github.com/drewc/gxjs/issues or contact the author.

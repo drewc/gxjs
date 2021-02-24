@@ -1,377 +1,34 @@
-#+TITLE: Gambit's Universal Backend
-
-The entire reason we can compile Gambit scheme to JavaScript is because of the
-universal backend!
-
-* Introduction
-
-Because we want to start with a mininal runtime we do actually need to see what
-is "built in". That is to say, from going over things in a wee bit of details,
-there are *Unviversal Abstract Data Types*, or ~uadt~'s that are, by default,
-laid out and implemented by and within the compiler.
-
-The idea is that by just using "those", as is, we can have a lot of things
-available with almost no runtime cost or size.
-
-It seems the file ~"_t-univ-4.scm"~ has the details.
-
-* Runtime! ~gambit-scheme/runtime.js~
-
-Right now, <2021-02-01 Mon>, it seems that *Node.js* is the goto place and there
-are two types of "modules" or "scripts" that don't really compete and don't
-really get along.
-
-Then there's the browser(s), blah blah blah. ES2015 introduced two different
-modes:
-
-   - ~script~ for regular scripts with a global namespace
-   - ~module~ for modular code with explicit imports and exports
-
-But in 2015 I'd already been a professional web developer for about 20 years,
-with applcation that use *JS* running at least 15 of those. There were already
-many ways to deal with "modules".
-
-Because they are different beasts I get confused a lot.
-
-*CommonJS scripts* use ~require()~ and ~module.exports~. *ESM modules* use
-~import~ and ~export~.
-
-  - ~import~ can be async, and *ESM modules* can have toplevel ~await~.
-  - ~require~ is synchronous and we can treat scripts that way.
-
-Sigh!! :)
-
-But the universal does not care about how it is presented. What really matters
-is that we can act synchronously at some point.
-
-Still, it's a library made for all. so ...
-
-#+begin_quote
-I’ll conclude with three guidelines for library authors to follow:
-
-  - Provide a CJS version of your library
-  - Provide a thin ESM wrapper for your CJS named exports
-  - Add an exports map to your package.json
-
-—https://redfin.engineering/node-modules-at-war-why-commonjs-and-es-modules-cant-get-along-9617135eeca1
-#+end_quote
-
-
-#+begin_src javascript :tangle ../packages/gambit-scheme/runtime.js
-const RTS = require('gxjs-loader?-link&return=RTS&exports&gxGambcSharp=false!./universal.scm');
-
-module.exports = RTS
-#+end_src
-
-* ~univ.scm~
-
-#+begin_src scheme :tangle ../packages/gambit-scheme/universal.scm :noweb yes
+;;; Copyright (c) 2021 by Drew Crampsie, All Rights Reserved.
+;;; Copyright (c) 1994-2020 by Marc Feeley, All Rights Reserved.
+(declare (extended-bindings))
 (namespace (""))
-(##declare
-  (multilisp)
-  (extended-bindings)
-  (not safe)
-  (block)
-  (inlining-limit 134)
-  ;(not run-time-bindings)
-;  (standard-bindings)
-)
-(declare (extended-bindings))
 
-;;; Common modules of the runtime system.
-(##define-macro (incl filename)
-  `(##declare-scope
-    (##macro-scope
-     (##namespace-scope
-      (##include ,filename)))))
-
-(incl "universal/prim.scm")
-(incl "rts.scm")
-
-(define (##init-gambit-module mod)
-  (let ((init (##vector-ref mod 4)))
-    (if (not (##procedure? init)) (##inline-host-statement "alert('Cannot find init function in ' + RTS.module_name(@1@)); " mod)
-        (init))))
-
-(define (##init-gambit-program)
-  (declare (extended-bindings) (not safe))
-    (let ((mods (##vector-ref ##program-descr 0)))
-      (let loop ((i 1)) ;; start at module after the current one
-        (if (##fx< i (##vector-length mods))
-            (let ((mod (##vector-ref mods i)))
-              (##init-gambit-module mod) ;; call module's init procedure
-              (loop (##fx+ i 1)))))))
-
-
-(##init-gambit-program)
-
-;;; (##inline-host-declaration "console.log('Loaded univ.scm file')")
-
-(##inline-host-statement #<<EOF
-RTS.module_register = function(module_descr) {
-  const r = this;
-  r.sp = -1;
-  r.stack[++this.sp] = void 0;
-  r.r0 = this.underflow;
-  r.nargs = 0;
-  r.trampoline(module_descr[4]);
-};
-
-EOF
-)
-
-#+end_src
-
-* *Gambit*'s ~RTS~ object.
-:PROPERTIES:
-:CUSTOM_ID: univRTS
-:END:
-
-#+begin_quote
-Marc Feeley @feeley Dec 21 2020 08:04
-@drew [...] gambit already has a mode to generate all the RTS in a RTS object
-
-% gsc -target js -c -repr-module class hw.scm
-
-— https://gitter.im/gambit/gambit?at=5fe0cdc8c746c6431cca5875
-#+end_quote
-
-There's a few minor changes we want to make.
-
-** ~RTS.Foreign~ and all lists are vectors in "scm2host"
-:PROPERTIES:
-:CUSTOM_ID: jsoForeign
-:END:
-
-*** Lists are vectors
-
-We'll pass an object as an arg for ~scm2host~ that can change this, but right
-now, all lists become vectors when passed and stay that way.
-
-
-*** Foreigners are welcome
-
-As of the release ~v4.9.3~ *Gambit*'s ~RTS.scm2host~ does not accept foreign
-types.
-
-In other (code) words :
-
-#+begin_src javascript
-bar = RTS.host2foreign(window);
-baz = RTS.scm2host(bar);
-// Uncaught scm2host error
-#+end_src
-
-Also, ~RTS.host2scm~ goes through the object and attempts to make an ~alist~ out
-of it. Unfortunatly, since a lot of objects recursively contain themselves, this
-fails a lot as well.
-
-Don't try this without the fixes. I've gotten "Paused before potenial out of
-memory crash" at the ~js~ *REPL* and stack blows for different attempts. :)
-
-#+begin_src javascript
-bat = RTS.host2scm(window);
-#+end_src
-
-We'll change that.
-
-*** ~scm2host~
-#+begin_src javascript :noweb-ref scm2host
-RTS.scm2host = function (obj) {
-  if (obj === void 0) {
-    return obj;
-  }
-  if (obj === null) {
-    return obj;
-  }
-  if (typeof obj === "boolean") {
-    return obj;
-  }
-  if (typeof obj === "number") {
-    return obj;
-  }
-  // this is what we add! -- drewc@gxjs
-  if (obj instanceof RTS.Foreign) {
-    return RTS.foreign2host(obj);
-  }
-  if (obj instanceof RTS.Flonum) {
-    return obj.val;
-  }
-  if (obj instanceof RTS.ScmString) {
-    return obj.toString();
-  }
-  if (obj instanceof Array) {
-    return obj.map( RTS.scm2host );
-  }
-  if (obj instanceof RTS.U8Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.U16Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.U32Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.S8Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.S16Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.S32Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.F32Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.F64Vector) {
-    return obj.elems;
-  }
-  if (obj instanceof RTS.Pair) {
-    return RTS.list2vector(obj);
-    // var jsobj = {};
-    // var i = 0;
-    // while (obj instanceof RTS.Pair) {
-    //   var elem = obj.car;
-    //   if (elem instanceof RTS.Pair) {
-    //     jsobj[RTS.scm2host(elem.car)] = RTS.scm2host(elem.cdr);
-    //   } else {
-    //     jsobj[i] = RTS.scm2host(elem);
-    //   }
-    //   ++i;
-    //   obj = obj.cdr;
-    // }
-    // return jsobj;
-  }
-  if (obj instanceof RTS.Structure) {
-    throw "scm2host error (cannot convert Structure)";
-  }
-  if (typeof obj === "function") {
-    return RTS.procedure2host(obj);
-  }
-  throw "scm2host error";
-};
-
-#+end_src
-
-*** ~host2scm~
-:PROPERTIES:
-:CUSTOM_ID: RTS.host2scm
-:END:
-
-#+begin_src javascript :noweb-ref host2scm
-RTS.host2scm = function (obj) {
-  if (obj === void 0) {
-    return void 0;
-  }
-  if (obj === null) {
-    return null;
-  }
-  if (typeof obj === "boolean") {
-    return obj;
-  }
-  if (typeof obj === "number") {
-    if ((obj | 0) === obj && obj >= -536870912 && obj <= 536870911) {
-      return obj;
-    } else {
-      return new RTS.Flonum(obj);
-    }
-  }
-  if (typeof obj === "function") {
-    return RTS.host_function2scm(obj);
-  }
-  if (typeof obj === "string") {
-    return new RTS.ScmString(RTS.str2codes(obj));
-  }
-  if (obj instanceof Array) {
-    return obj.map( RTS.host2scm );
-  }
-  if (obj instanceof Uint8Array) {
-    return new RTS.U8Vector(obj);
-  }
-  if (obj instanceof Uint16Array) {
-    return new RTS.U16Vector(obj);
-  }
-  if (obj instanceof Uint32Array) {
-    return new RTS.U32Vector(obj);
-  }
-  if (obj instanceof Int8Array) {
-    return new RTS.S8Vector(obj);
-  }
-  if (obj instanceof Int16Array) {
-    return new RTS.S16Vector(obj);
-  }
-  if (obj instanceof Int32Array) {
-    return new RTS.S32Vector(obj);
-  }
-  if (obj instanceof Float32Array) {
-    return new RTS.F32Vector(obj);
-  }
-  if (obj instanceof Float64Array) {
-    return new RTS.F64Vector(obj);
-  }
-  if (typeof obj === "object") {
-    return RTS.host2foreign(obj);
-    // var alist = null;
-    // for (var key in obj) {
-    // alist = new RTS.Pair(new RTS.Pair(RTS.host2scm(key),RTS.host2scm(obj[key])),alist);
-    // }
-    // return alist;
-  }
-  throw "host2scm error";
-};
-
-#+end_src
-
-
-* /File/ univ/rts.scm
-#+begin_src scheme :tangle ../packages/gambit-scheme/rts.scm :noweb yes
-(declare (extended-bindings))
-(##inline-host-declaration
- #<<EOF
-//  <<RTS.mod_init>>
-
- <<scm2host>>
-
- <<host2scm>>
-EOF
-)
-
-;; (##inline-host-statement "console.log('RTS Statement')")
-
-#+end_src
-
-* /File/ gambit/lib/list.scm
-
-#+begin_src scheme :tangle ../gambit-scheme/list.scm :mkdirp yes
-(declare (extended-bindings))
-(##define-macro (incl filename)
-  `(##declare-scope
-    (##macro-scope
-     (##namespace-scope
-      (##include ,filename)))))
-
-(incl "~~lib/gambit/list/list.scm")
-#+end_src
-* Universal Library Code: Univ is, what I got
-
-In gambit there's a file, *_t-univ-4.scm* that has ~univ-define-prim~. What is
-does is define primitives for the compiler and linker it seems.
-
-
-** ~eq?~, ~##fx=~
-
-This is kindof needed for testing :)
-
-#+begin_src scheme :noweb-ref equality
 (define-prim (##eq? obj1 obj2))
 (define-prim (eq? obj1 obj2) (macro-force-vars (obj1 obj2) (##eq? obj1 obj2)))
 (define-prim (##fx= o1 o2))
-#+end_src
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-** Jobs
+(define-prim (##identity x)
+  x)
 
-#+begin_src scheme :noweb-ref jobs
+(define-prim (identity x)
+  x)
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+(define-prim (##void))
+
+(define-prim (void)
+  (##void))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+(define-prim (##absent-object)
+  (macro-absent-obj))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
 ;;;----------------------------------------------------------------------------
 
 ;;; Jobs.
@@ -405,9 +62,6 @@ This is kindof needed for testing :)
 
 ;;;----------------------------------------------------------------------------
 
-#+end_src
-** Process Exit
-#+begin_src scheme :noweb-ref process-exit
 ;;;----------------------------------------------------------------------------
 
 ;;; Process exit.
@@ -500,68 +154,7 @@ This is kindof needed for testing :)
 (define ##feature-intr-terminate
   (##intr-terminate-handler-set! ##exit-abruptly))
 
-#+end_src
-** Basic type predicates
 
-#+begin_src scheme
-;;; File: "_system.scm"
-;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-;;; Basic type predicates.
-
-(define-prim (##fixnum? obj))
-
-;; (##vector? obj) is defined in "_std.scm"
-
-(define-prim (##ratnum? obj))
-(define-prim (##cpxnum? obj))
-(define-prim (##structure? obj))
-(define-prim (##values? obj))
-(define-prim (##frame? obj))
-(define-prim (##continuation? obj))
-(define-prim (##promise? obj))
-(define-prim (##return? obj))
-
-;; (##string? obj) is defined in "_std.scm"
-;; (##s8vector? obj) is defined in "_std.scm"
-;; (##u8vector? obj) is defined in "_std.scm"
-;; (##s16vector? obj) is defined in "_std.scm"
-;; (##u16vector? obj) is defined in "_std.scm"
-;; (##s32vector? obj) is defined in "_std.scm"
-;; (##u32vector? obj) is defined in "_std.scm"
-;; (##s64vector? obj) is defined in "_std.scm"
-;; (##u64vector? obj) is defined in "_std.scm"
-;; (##f32vector? obj) is defined in "_std.scm"
-;; (##f64vector? obj) is defined in "_std.scm"
-
-(define-prim (##flonum? obj))
-(define-prim (##bignum? obj))
-(define-prim (##unbound? obj))
-(define-prim (##foreign? obj))
-
-(macro-case-target
- ((C)
-  (define-prim (##type obj))
-  (define-prim (##type-cast obj type))
-  (define-prim (##subtype obj))
-  (define-prim (##subtype-set! obj subtype))))
-
-;; The following definitions only make sense with the C backend but need
-;; to be defined for all backends.
-
-(define-prim (##subtyped? obj) #f)
-(define-prim (##subtyped.vector? obj) #f)
-(define-prim (##subtyped.symbol? obj) #f)
-(define-prim (##subtyped.flonum? obj) #f)
-(define-prim (##subtyped.bignum? obj) #f)
-(define-prim (##special? obj) #f)
-(define-prim (##meroon? obj) #f)
-(define-prim (##jazz? obj) #f)
-(define-prim (##gc-hash-table? obj) #f)
-#+end_src
-** ~##raise-type-exception~
-
-#+begin_src scheme :noweb-ref raise-type-exception
 
 ;;----------------------------------------------------------------------------
 
@@ -668,49 +261,7 @@ This is kindof needed for testing :)
       proc args arg-num type-id)
      (macro-raise
       (macro-make-type-exception procedure arguments arg-num type-id)))))
-#+end_src
-** ~void~, ~identity~ and ~##absent-object~
 
-Took me a while to figure out what the error was all about.
-: TypeError: (intermediate value)(intermediate value)(intermediate value)(intermediate value)(intermediate value)(intermediate value)(...) is not a function
-
-#+begin_src scheme :noweb-ref identity-void-absent
-;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-(define-prim (##identity x)
-  x)
-
-(define-prim (identity x)
-  x)
-
-;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-(define-prim (##void))
-
-(define-prim (void)
-  (##void))
-
-;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-(define-prim (##absent-object)
-  (macro-absent-obj))
-
-;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-#+end_src
-
-** ~fixnum?~, fx-foo
-
-#+begin_src scheme :noweb-ref fxnums
-(define-prim (fixnum? obj)
-  (macro-force-vars (obj)
-    (##fixnum? obj)))
-
-#+end_src
-
-** ~apply~ is needed
-
-#+begin_src scheme :noweb-ref apply
 (define (##apply proc arg1 . rest)
   (declare (not inline))
   (if (##pair? rest)
@@ -731,14 +282,7 @@ Took me a while to figure out what the error was all about.
   (if (##pair? rest)
     (##apply ##apply proc (cons arg1 rest))
     (##apply proc arg1)))
-#+end_src
 
-
-** ~vector~'s are really important
-
-We've made ~list->vector~ a primitive here as well. We'll also add ~list2vector~ to the RTS.
-
-#+begin_src scheme :noweb-ref list->vector
 (##inline-host-declaration  "
 RTS.list2vector = function (list) {
    const vec = [];
@@ -758,9 +302,7 @@ RTS.list2vector = function (list) {
   (##inline-host-expression " RTS.list2vector(@1@); " lst))
 
 (define-prim (list-vector lst) (##list->vector lst))
-#+end_src
 
-#+begin_src scheme :noweb-ref vector
 ;; AUTOMAGIC:  vector?, vector-length, vector-ref, vector-set!
 
 (define-prim (##vector . lst) (##list->vector lst))
@@ -773,27 +315,10 @@ RTS.list2vector = function (list) {
 
 (define-prim (##vector-shrink! arg1 arg2))
 (define-prim (vector-shrink! arg1 arg2) (##vector-shrink! arg1 arg2))
-#+end_src
 
-** ~string~'s are everywhere
-
-
-#+begin_src scheme :noweb-ref make-string
 (define-prim (##make-string k #!optional (fill #\null))
   (##make-string k fill))
 (define-prim make-string ##make-string)
-#+end_src
-
-I use ~string-append~ a lot. As luck would have it *Gambit*'s string primitive is just an object with char codes as an array.
-
-ie:
-
-#+begin_src javascript
-> RTS.host2scm('asd');
-=> { codes: [ 97, 115, 100 ] }
-#+end_src
-
-#+begin_src scheme :noweb-ref string-append
 (define-prim (##string-append . strs)
   (let ((s (##make-string 0)))
     (let app ((ss strs))
@@ -809,10 +334,7 @@ s (car ss))
           (app (cdr ss)))))))
 
 (define-prim (string-append . strs) (apply ##string-append strs))
-#+end_src
 
-
-#+begin_src scheme :noweb-ref string=?
 (define-prim (##string=? s . strs)
   (let lp ((ss strs))
     (if (##null? ss) #t
@@ -823,14 +345,8 @@ return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
 })((@1@).codes, (@2@).codes);" s (car ss))
                (lp (cdr ss)))))))
 (define-prim (string=? . ss) (##apply ##string=? ss))
-#+end_src
 
-** ~table~'s, because hash is a good thing!
-
-It seems that they are currently stored in *Gambit*'s =~~lib/_system.scm=. We
-take them out and put them here.
-
-#+begin_src scheme :noweb-ref tables
+(##include "~~lib/_system#.scm")
 ;;;----------------------------------------------------------------------------
 
 ;;; Tables.
@@ -1233,47 +749,6 @@ take them out and put them here.
 (define-prim (table-for-each proc table)
   (##table-for-each proc table))
 
-#+end_src
-
-
-
-** /File/ ~univ/vector.scm~
-#+begin_src scheme :noweb yes :tangle "../gambit-scheme/universal/vector.scm" :mkdirp t
-(declare (extended-bindings))
-(namespace (""))
-<<vector>>
-#+end_src
-
-
-** /File/ ~universal/prim.scm~
-
-#+begin_src scheme :noweb yes :tangle "../packages/gambit-scheme/universal/prim.scm" :mkdirp yes
-;;; Copyright (c) 2021 by Drew Crampsie, All Rights Reserved.
-;;; Copyright (c) 1994-2020 by Marc Feeley, All Rights Reserved.
-(declare (extended-bindings))
-(namespace (""))
-
-<<equality>>
-<<identity-void-absent>>
-
-<<jobs>>
-<<process-exit>>
-
-<<raise-type-exception>>
-
-<<apply>>
-
-<<list->vector>>
-
-<<vector>>
-
-<<make-string>>
-<<string-append>>
-
-<<string=?>>
-
-(##include "~~lib/_system#.scm")
-<<tables>>
 
 (##include "~~lib/gambit/list/list#.scm")
 
@@ -1680,111 +1155,3 @@ take them out and put them here.
       (if (eq? fill (macro-absent-obj))
           (##make-list n)
           (##make-list n fill)))))
-
-#+end_src
-
-
-* Testing
-
-
-https://github.com/canjs/can-define-lazy-value/blob/4c8529d566f33eb6566bbb9da93e003192545e85/dist/cjs/define-lazy-value.js
-
-#+begin_src shell
-cd ../gambit-scheme/ && yarn run webpack && du -h dist/* && cd - ; cd ../gxjs-tests/; yarn run webpack ; node -e "require ('./dist/main.js')"
-#+end_src
-
-
-#+begin_src scheme :tangle ../packages/gxjs-tests/universal.scm :noweb yes
-(declare (extended-bindings))
-#;(declare (extended-bindings standard-bindings
-                            ))
-
-;; (##inline-host-statement "console.error('make-vector', @1@)" make-vector)
-
-(define (test> name i pred j)
-  (let ((res (pred i j)))
-    (##inline-host-statement "
-     (() => {
-      function hst (thing) {
-         try { return RTS.scm2host(thing) } catch { return thing } ;
-     };
-     const name = hst(@1@);
-     const i = hst(@2@);
-     const j = hst(@3@);
-     const res = (@4@);
-     const msg = name + ' ' + JSON.stringify(i) + ' => ' + JSON.stringify(j);
-     if (res) {
-       console.log('Success:', msg)
-     } else {
-       console.error('Failure', msg)
-     }
-   })()
-
-" name i j res)))
-
-(define (test-prim-vector)
-  (let ((v (vector 1 2 3)))
-    (test> "vector? #t" (vector? v) eq? #t)
-    (test> "vector" v eq? v)
-    (test> "make-vector" (make-vector 5) (lambda (a b) (vector? a)) #t)
-    (test> "vector-length" (vector-length (make-vector 42)) ##fx= 42)
-    (test> "vector-set!" (let ((v (vector 0 1 2)))
-                           (vector-set! v 2 42)
-                           (vector-ref #(0 1 42) 2))
-           ##fx= 42)
-    (test> "vector-shrink!" (let ((v (vector 0 1 2 3 4)))
-                              (vector-shrink! v 1)
-                              (vector-length v))
-           ##fx= 1)))
-
-(define (test-prim-list)
- (let* ((l1 (list #t #f 3 4))
-        (l2 (list))
-        (c1 (cons 4 2))
-        (c2 (cons (cons 4 2) (cons 8 6)))
-        (c3 (cons 16 (cons 32 c2))))
-
-   (test> "not null?" (null? l1) eq? #f)
-   (test> "null?" (null? l2) eq? #t)
-   (test> "not pair?" (pair? l2) eq? #f)
-   (test> "pair?" (pair? l1) eq? #t)
-
-   (test> "car" (car c1) ##fx= 4)
-   (test> "cdr" (cdr c1) ##fx= 2)
-   (test> "cadr" (cadr l1) eq? #f)
-   (test> "cdar" (cdar c2) ##fx= 2)
-   (test> "cddr" (cddr c2) ##fx= 6)
-   (test> "cdddr" (car (cdddr c3)) ##fx= 8)
-   (test> "caddr" (pair? (caddr c3)) eq? #t)
-   (test> "set-car!" (let ((_ (set-car! c1 7))) (car c1))
-          ##fx= 7)
-   (test> "set-cdr!" (let ((_ (set-cdr! c1 42))) (cdr c1))
-          ##fx= 42)
-   (test> "void" (list (##void) (void) #!void) eq? #t)
-
-   1234
-
-   ))
-
-(define (test-tables)
-  (let ((tbl (make-table)))
-    (test> "table?" (table? tbl) eq? #t)))
-
-(define (test-univ)
- (test> "eq?" 'foobar eq? 'foobar)
- (test> "eq? #t #t" #t eq? #t)
-
- (test-prim-vector)
- (test-prim-list)
-
- (test> "string-append" (string-append "asd" "qwe") string=? "asdqwe")
-
- (test-tables)
-
- (test> "fixnum?" (fixnum? 1) eq? #t)
- )
-
-(##inline-host-statement "module.exports = RTS.scm2host(@1@);" (lambda () (test-univ)))
-
-
-#+end_src
