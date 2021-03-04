@@ -1,9 +1,8 @@
-const gerbil = require('gerbil-loader');
 const spawn_gsc = require ('./gsc.js')
 const spawn_gxc = require ('./gxc.js')
 const path = require('path');
 const fs = require('fs');
-
+const { getOptions } = require('loader-utils')
 const { ensureAST, generate } = require('./syntax.js')
 const minimizeGambitNamespace = require ('./namespace-min.js')
 const lexify = require('./lexify.js')
@@ -44,6 +43,11 @@ function callGerbil(options, ...filesAndCallback) {
   return;
 }
 
+/* Gambit
+
+   could be -link
+*/
+
 function callGambit(options, ...filesAndCallback) {
 
   const files = allFiles(filesAndCallback);
@@ -53,9 +57,46 @@ function callGambit(options, ...filesAndCallback) {
   const verbose = ((v) => v === undefined ? false : v)(options['-v']);
   function log (...args) { if (verbose) { console.log(...args) } };
 
+  const isLink = options['-link'];
+
   log("calling Gambit, ", ...files, options)
 
-  spawn_gsc( { cwd: cwd, '-link': options['-link'] } , gambit => callback(gambit), ...files);
+  function callCallback (gambit) {
+    if (!isLink) {
+      return callback(gambit);
+    } else {
+      return spawn_gsc(
+        {
+          cwd: gambit.root,
+          temp: gambit.root,
+          '-link': true,
+          gxGambcSharp: options.gxGambcSharp
+        },
+        linkGambit => {
+          if (linkGambit.error) {
+            gambit.error = linkGambit.error;
+            return callback(gambit);
+          }
+
+          gambit.link = linkGambit.outputs[0];
+          return callback(gambit)
+
+
+        },
+        ...gambit.outputs
+      );
+
+    }
+  };
+
+  spawn_gsc(
+    {
+      cwd: cwd,
+      gxGambcSharp: options.gxGambcSharp
+    },
+    callCallback,
+    ...files
+  );
 
   return;
 }
@@ -94,8 +135,14 @@ function loadGxJS(options, ...filesAndCallback) {
     return runit;
   })(options)
 
+  const gxGambcSharp = (o => o === undefined ? true : o === '' ? true : o)(options.gxGambcSharp);
+  options.gxGambcSharp = gxGambcSharp;
+  log('\n\n\gx-gambc#?', options.gxGambcSharp);
+
   const addModuleExports = (e => (e === undefined) ? false : (e === '') ? true : e)(options.exports);
-  const gambitLink = (l => (l === undefined) ? false : (l === '') ? true : l)(options.['-link']);
+
+  const gambitLink = (l => (l === undefined) ? false : (l === '') ? true : l)(options.['-link'])
+  options.['-link'] = gambitLink;
 
 
   function rm_rf (dir) {
@@ -175,17 +222,27 @@ function loadGxJS(options, ...filesAndCallback) {
         }
       })(gambit.outputs);
 
+      let linkAst = false;
+      if (gambit.link !== undefined) {
+        const linkFile = fs.readFileSync(gambit.link, {encoding: 'utf8'})
+        // Change the module init to not need `_gambit`
+        log('Changing mod registry init in', gambit.link)
+        linkAST = changeModInit(
+          ensureAST(linkFile),
+          { verbose: verbose }
+        );
+      }
+
       log('Have', ASTs.length, 'ASTs', 'link?', gambitLink)
       if (!error) {
         try {
-          if (!gambitLink) {
-            // Minimize things in "__GxJS__.*" namespace.
-            // i.e.:  __GxJS.bb1_runtime_23_.name => a.b.name
-            ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
-          } else {
-            // Change the module init to not need `_gambit`
-            log('Changing mod registry init')
-            ASTs = ASTs.map( ast => changeModInit(ast, { verbose: verbose }) )
+          // Minimize things in "__GxJS__.*" namespace.
+          // i.e.:  __GxJS.bb1_runtime_23_.name => a.b.name
+          ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
+
+          if (gambit.link !== undefined ) {
+            ASTs = [linkAST, ...ASTs]
+
           }
 
           // No Undeclared Globals Allowed!!
@@ -214,7 +271,7 @@ function loadGxJS(options, ...filesAndCallback) {
 
 
           // Most modules need a runtime system. By default ours is "gxjs"
-          if (RTSrequire && !gambitLink) {
+          if (RTSrequire && (!gambitLink || gambit.link === undefined)) {
             AST = prependConstRTS(AST, RTSrequire, { verbose: verbose })
           }
 
@@ -242,9 +299,19 @@ function loadGxJS(options, ...filesAndCallback) {
 function gxjsLoader () {
   const callback = this.async()
   const rpath = this.resourcePath
-  const options = this.getOptions();
 
-  console.log('gxjs:', rpath, options);
+  const getO = () => {
+    if (typeof this.getOptions === 'function') {
+      return this.getOptions()
+    } else {
+    return getOptions(this)
+    }
+  }
+
+  const options = getO();
+
+  console.log('options', options, getOptions(this))
+
   const cwd = path.dirname(this.resourcePath);
 
   const RTSrequire = (req => req === undefined ? 'gxjs' : req)(options['RTS']);
@@ -255,7 +322,7 @@ function gxjsLoader () {
   options['-v'] = verbose
   function log (...args) { if (verbose) { console.log(...args) } };
 
-  log("Loading GxJS using gxjsLoader: ", rpath, options)
+  log("\n\n**** Loading GxJS using gxjsLoader: ", rpath, options)
 
   loadGxJS(options, rpath, callback);
 

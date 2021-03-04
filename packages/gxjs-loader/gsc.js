@@ -11,12 +11,24 @@ function spawn_gsc(opts, callback, ...files) {
   const cwd = opts.cwd;
   const gsc = which.sync('gsc');
 
-  const temp = mktemp.createDirSync('Gambit-XXXX');
+  const verbose = ((v) => v === undefined ? false : v)(opts['-v']);
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+  const temp = (t => t === undefined ? mktemp.createDirSync('Gambit-XXXX') : t)(opts.temp);
 
   const libdir = execSync("gxi -e '(print (car (library-load-path)))'",
                          { encoding: 'utf8', shell: true})
-  const gxGambcSharp = find.fileSync('gx-gambc#.scm', libdir)[0];
-  const incGxGambcSharp = `(include "${gxGambcSharp}")`
+  const gxGambcSharp = (o => {
+    if (o === true) {
+      return find.fileSync('gx-gambc#.scm', libdir)[0];
+    } else {
+      return false
+    }
+  })(opts.gxGambcSharp);
+
+  // console.log("\n\n\n\n SHARTP!", gxGambcSharp, ...files, opts.gxGambcSharp);
+
+  const incGxGambcSharp = gxGambcSharp ? ['-e', `(include "${gxGambcSharp}")`] : []
 
 
   const link = (l => l === undefined ? false : (l !== false))(opts.['-link']);
@@ -28,7 +40,7 @@ function spawn_gsc(opts, callback, ...files) {
                 '-repr-module', 'class',
                 '-namespace', '__GxJS_',
                 '-o', temp, outputType,
-                '-e', incGxGambcSharp,
+                ...incGxGambcSharp,
                 ...files]
 
   const names = files.map(f => path.basename(f, path.extname(f)));
@@ -48,7 +60,8 @@ function spawn_gsc(opts, callback, ...files) {
 
   let stdout = "";
 
-  console.log('Running', cwd, '$', gsc, args.join(' '));
+  log('Running', cwd, '$', gsc, args.join(' '));
+
   ptyProcess.on('data', function(data) {
     console.log(data); stdout = stdout+data;
   });

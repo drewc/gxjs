@@ -228,7 +228,7 @@ RTS.scm2host = function (obj) {
     return obj.elems;
   }
   if (obj instanceof RTS.Pair) {
-    return RTS.list2vector(obj);
+    return RTS.scm2host(RTS.list2vector(obj));
     // var jsobj = {};
     // var i = 0;
     // while (obj instanceof RTS.Pair) {
@@ -249,7 +249,9 @@ RTS.scm2host = function (obj) {
   if (typeof obj === "function") {
     return RTS.procedure2host(obj);
   }
-  throw "scm2host error";
+
+  throw 'scm2host error:' + JSON.stringify(obj)
+  // return obj;
 };
 
 #+end_src
@@ -757,7 +759,29 @@ RTS.list2vector = function (list) {
 (define-prim (##list->vector lst)
   (##inline-host-expression " RTS.list2vector(@1@); " lst))
 
-(define-prim (list-vector lst) (##list->vector lst))
+(define-prim (list->vector lst) (##list->vector lst))
+#+end_src
+
+/Vice-Versa/ is usually a good idea.
+
+#+begin_src scheme :noweb-ref vector->list
+(##inline-host-declaration "
+RTS.vector2list = v => {
+function vec2list(vec, n=0)  {
+  if (n === vec.length) { return null };
+
+  return new RTS.Pair(vec[n], vec2list(vec, n + 1))
+
+ }
+
+ return vec2list(v)
+
+}
+")
+(define-prim (##vector->list vec)
+  (##inline-host-expression "RTS.vector2list(@1@); " vec))
+
+(define-prim (vector->list vec) (##vector->list vec))
 #+end_src
 
 #+begin_src scheme :noweb-ref vector
@@ -784,7 +808,7 @@ RTS.list2vector = function (list) {
 (define-prim make-string ##make-string)
 #+end_src
 
-I use ~string-append~ a lot. As luck would have it *Gambit*'s string primitive is just an object with char codes as an array.
+ As luck would have it *Gambit*'s string primitive is just an object with char codes as an array.
 
 ie:
 
@@ -793,6 +817,16 @@ ie:
 => { codes: [ 97, 115, 100 ] }
 #+end_src
 
+
+#+begin_src scheme :noweb-ref string-length
+(define-prim (##string-length str)
+  ;;(##inline-host-expression "console.log('str', (@1@))" str)
+  (##inline-host-expression "(str => str.codes.length)(@1@)" str))
+(define-prim (string-length str) (##string-length str))
+#+end_src
+
+
+I use ~string-append~ a lot.
 #+begin_src scheme :noweb-ref string-append
 (define-prim (##string-append . strs)
   (let ((s (##make-string 0)))
@@ -817,10 +851,13 @@ s (car ss))
   (let lp ((ss strs))
     (if (##null? ss) #t
         (begin
-          (and (##inline-host-expression "((a, b) => {
+          (and (##inline-host-expression "((as, bs) => {
+let a = (typeof as === 'object') ? as.codes : false;
+let b = (typeof bs === 'object') ? bs.codes : false;
+
 return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
     a.every((val, index) => val === b[index]);
-})((@1@).codes, (@2@).codes);" s (car ss))
+})((@1@), (@2@));" s (car ss))
                (lp (cdr ss)))))))
 (define-prim (string=? . ss) (##apply ##string=? ss))
 #+end_src
@@ -1236,7 +1273,250 @@ take them out and put them here.
 #+end_src
 
 
+** Numbers!! ~*~, ~/~, ~+~ etc
 
+#+begin_src scheme :noweb-ref num
+
+
+(define-prim (##number->string n)
+  (##inline-host-expression
+   "(() => { n = RTS.scm2host(@1@) ; return RTS.host2scm(n.toString()); })();" n))
+
+(define-prim number->string ##number->string)
+;;;----------------------------------------------------------------------------
+
+;;; Numerical type predicates.
+(define-prim (##number? x)
+  (##complex? x))
+
+(define-prim (##complex? x)
+  (macro-number-dispatch x #f
+    #t ;; x = fixnum
+    #t ;; x = bignum
+    #t ;; x = ratnum
+    #t ;; x = flonum
+    #t)) ;; x = cpxnum
+
+(define-prim (number? x)
+  (macro-force-vars (x)
+    (##number? x)))
+
+(define-prim (complex? x)
+  (macro-force-vars (x)
+    (##complex? x)))
+
+;; (define-prim (##real? x)
+;;   (macro-number-dispatch x #f
+;;     #t ;; x = fixnum
+;;     #t ;; x = bignum
+;;     #t ;; x = ratnum
+;;     #t ;; x = flonum
+;;     (macro-cpxnum-real? x))) ;; x = cpxnum
+
+;; (define-prim (real? x)
+;;   (macro-force-vars (x)
+;;     (##real? x)))
+
+;; (define-prim (##rational? x)
+;;   (macro-number-dispatch x #f
+;;     #t ;; x = fixnum
+;;     #t ;; x = bignum
+;;     #t ;; x = ratnum
+;;     (macro-flonum-rational? x) ;; x = flonum
+;;     (macro-cpxnum-rational? x))) ;; x = cpxnum
+
+;; (define-prim (rational? x)
+;;   (macro-force-vars (x)
+;;     (##rational? x)))
+
+;; (define-prim (##integer? x)
+;;   (macro-number-dispatch x #f
+;;     #t ;; x = fixnum
+;;     #t ;; x = bignum
+;;     #f ;; x = ratnum
+;;     (macro-flonum-int? x) ;; x = flonum
+;;     (macro-cpxnum-int? x))) ;; x = cpxnum
+
+;; (define-prim (integer? x)
+;;   (macro-force-vars (x)
+;;     (##integer? x)))
+
+(define-prim (##exact-integer? x)
+  (macro-exact-int? x))
+
+(define-prim (exact-integer? x)
+   (macro-force-vars (x)
+     (macro-exact-int? x)))
+
+
+(define-prim (##+ . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a + b, 0) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim (+ . xs) (##apply ##+ xs))
+(define-prim (##* . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a * b, 1) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim (* . xs) (##apply ##* xs))
+(define-prim (##- . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a - b) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim - ##-)
+(define-prim (##/ . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a / b, 1) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim / ##/)
+
+
+(define-prim (##= . xs)
+  (##inline-host-expression
+   "((xs) => {
+      const _ret = xs.reduce((a, b) => { return (a == b) ?  b : NaN });
+      return !isNaN(_ret)})(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim = ##=)
+
+(define-prim (##< . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a < b) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim < ##<)
+(define-prim (##> . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a > b) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+(define-prim > ##>)
+
+
+(define-prim (##<= . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a <= b) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+ (define-prim <= ##<=)
+(define-prim (##>= . xs)
+ (##inline-host-expression
+   "((xs) => { return xs.reduce((a, b) => a >= b) })(RTS.scm2host(@1@));"
+   (##list->vector xs)))
+ (define-prim >= ##>=)
+
+(define-prim (##expt x y)
+  (##inline-host-expression "( @1@ ** @2@ )" x y))
+
+(define-prim (expt x y)
+  (macro-force-vars (x y)
+    (##expt x y)))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; abs
+(define-prim (##abs x)
+ (##inline-host-expression "Math.abs(@1@);" x))
+
+(define-prim (abs x)
+  (macro-force-vars (x)
+    (##abs x)))
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+;;; gcd, lcm
+
+(define-prim (##gcd . xs)
+  (##inline-host-expression
+"((arr) => {
+  var i, y,
+      n = arr.length,
+      x = Math.abs(arr[0]);
+
+  for (i = 1; i < n; i++) {
+    y = Math.abs(arr[i]);
+
+    while (x && y) {
+      (x > y) ? x %= y : y %= x;
+    }
+    x += y;
+  }
+  return x;
+})(RTS.scm2host(@1@))" (##list->vector xs)))
+
+(define-prim gcd ##gcd)
+
+(define-prim (##lcm . xs)
+  (##inline-host-expression "((A) =>
+{
+    var n = A.length, a = Math.abs(A[0]);
+    for (var i = 1; i < n; i++)
+     { var b = Math.abs(A[i]), c = a;
+       while (a && b){ a > b ? a %= b : b %= a; }
+       a = Math.abs(c*A[i])/(a+b);
+     }
+    return a;
+})(RTS.scm2host(@1@));" (##list->vector xs)))
+
+(define-prim lcm ##lcm)
+
+;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(define-prim (##floor x)
+
+  (define (type-error)
+    (##fail-check-finite-real 1 floor x))
+
+  (macro-number-dispatch x (type-error)
+    x
+    x
+    (let ((num (macro-ratnum-numerator x))
+          (den (macro-ratnum-denominator x)))
+      (if (##negative? num)
+          (##quotient (##- num (##- den 1)) den)
+          (##quotient num den)))
+    (if (##flfinite? x)
+        (##flfloor x)
+        (type-error))
+    (if (macro-cpxnum-real? x)
+        (##floor (macro-cpxnum-real x))
+        (type-error))))
+
+(define-prim (floor x)
+  (macro-force-vars (x)
+    (##floor x)))
+
+(define-prim (##ceiling x)
+
+  (define (type-error)
+    (##fail-check-finite-real 1 ceiling x))
+
+  (macro-number-dispatch x (type-error)
+    x
+    x
+    (let ((num (macro-ratnum-numerator x))
+          (den (macro-ratnum-denominator x)))
+      (if (##negative? num)
+          (##quotient num den)
+          (##quotient (##+ num (##- den 1)) den)))
+    (if (##flfinite? x)
+        (##flceiling x)
+        (type-error))
+    (if (macro-cpxnum-real? x)
+        (##ceiling (macro-cpxnum-real x))
+        (type-error))))
+
+(define-prim (ceiling x)
+  (macro-force-vars (x)
+    (##ceiling x)))
+
+
+;; ;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+(define-prim (##string->number str #!optional (rad 10))
+  (if (= rad 10)
+    (##inline-host-expression "Number(RTS.scm2host(@1@))" str)
+    (##inline-host-expression "parseInt(RTS.scm2host(@1@), @2@)" str rad)))
+
+(define-prim string->number ##string->number)
+
+
+#+end_src
 ** /File/ ~univ/vector.scm~
 #+begin_src scheme :noweb yes :tangle "../gambit-scheme/universal/vector.scm" :mkdirp t
 (declare (extended-bindings))
@@ -1252,7 +1532,6 @@ take them out and put them here.
 ;;; Copyright (c) 1994-2020 by Marc Feeley, All Rights Reserved.
 (declare (extended-bindings))
 (namespace (""))
-
 <<equality>>
 <<identity-void-absent>>
 
@@ -1264,16 +1543,20 @@ take them out and put them here.
 <<apply>>
 
 <<list->vector>>
+<<vector->list>>
 
 <<vector>>
 
 <<make-string>>
+<<string-length>>
 <<string-append>>
 
 <<string=?>>
 
 (##include "~~lib/_system#.scm")
 <<tables>>
+
+<<num>>
 
 (##include "~~lib/gambit/list/list#.scm")
 

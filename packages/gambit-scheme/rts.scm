@@ -54,7 +54,7 @@
      return obj.elems;
    }
    if (obj instanceof RTS.Pair) {
-     return RTS.list2vector(obj);
+     return RTS.scm2host(RTS.list2vector(obj));
      // var jsobj = {};
      // var i = 0;
      // while (obj instanceof RTS.Pair) {
@@ -75,7 +75,9 @@
    if (typeof obj === "function") {
      return RTS.procedure2host(obj);
    }
-   throw "scm2host error";
+ 
+   throw 'scm2host error:' + JSON.stringify(obj)
+   // return obj;
  };
  
 

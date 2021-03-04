@@ -1,7 +1,7 @@
 {
   "name": "gxjs-loader",
-  "version": "0.0.3",
-  "description": "(G)erbil E(x)tended (J)avaScript (S)cheme loader",
+  "version": "0.0.4",
+  "description": "(G)erbil E(x)tended (J)avaScript (S)cheme Loader",
   "main": "dist/gxjs-loader.js",
   "files": [
     "dist/",
@@ -11,10 +11,16 @@
   "author": "Drew Crampsie <me@drewc.ca>",
   "license": "MIT",
   "dependencies": {
+    "acorn": "^8.0.5",
+    "acorn-walk": "^8.0.2",
+    "astring": "^1.7.0",
+    "find": "^0.3.0",
+    "loader-utils": "^2.0.0",
     "node-pty": "^0.10.0",
     "path": "^0.12.7"
   },
   "devDependencies": {
+    "mktmp": "^1.0.1",
     "which": "^2.0.2"
   }
 }
