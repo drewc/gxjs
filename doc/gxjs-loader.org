@@ -9,10 +9,13 @@ yarn run lerna add node-pty packages/gxjs-loader
 #+end_src
 
 
-* Usage
-
 *GxJS Loader* is used to take either source code written in *Gerbil* or *Gambit*
  scheme and transpile them to *JavaScript*.
+
+* Usage
+:PROPERTIES:
+:CUSTOM_ID: GxJSLoaderUsage
+:END:
 
 ** Gerbil
 
@@ -62,7 +65,7 @@ started GxJS loader!
 finished GxJS loader
 This is GxJS! { codes: [ 121, 97, 121, 33 ] } {
   thisIsTheAnswer: 42,
-  this: 'is how we hake the moonshine',
+  this: 'is how we make the moonshine',
   'This is valid': {
     name: 'symbols-have-no-js-value!',
     hash: 386716666,
@@ -160,6 +163,9 @@ around. Here are the options.
        ~'gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./gxjs-link-loader-runtime.ss'~
        or ~'gxjs-loader?RTS=./gxjs-link-loader.js!./gxjs-link-use-runtime.ss'~
 
+     - ~gxGambcSharp~ :: ~true~ by default, declares if ~gsc~ should load
+       ~gx-gambc#~ before the file. This is for Gerbil Syntax.
+
 
 
 *** ~-link~ to create and embed a runtime system.
@@ -172,7 +178,6 @@ contained in ~'gxjs'~, we actually want the compiler to create one for us.
 Let's create the runtime we want, which is the smallest. Essentially all it does
 is change the upstream (Gambit ~v4.9.3~) module initialization to one that
 always runs.
-
 
 #+begin_src scheme :tangle ../packages/gxjs-tests/gxjs-link-loader-runtime.ss
 (import :js)
@@ -220,15 +225,12 @@ module.exports = answer;
 
 * Loader
 
-
-
 #+begin_src javascript :tangle ../packages/gxjs-loader/gxjs-loader.js
-const gerbil = require('gerbil-loader');
 const spawn_gsc = require ('./gsc.js')
 const spawn_gxc = require ('./gxc.js')
 const path = require('path');
 const fs = require('fs');
-
+const { getOptions } = require('loader-utils')
 const { ensureAST, generate } = require('./syntax.js')
 const minimizeGambitNamespace = require ('./namespace-min.js')
 const lexify = require('./lexify.js')
@@ -269,6 +271,11 @@ function callGerbil(options, ...filesAndCallback) {
   return;
 }
 
+/* Gambit
+
+   could be -link
+,*/
+
 function callGambit(options, ...filesAndCallback) {
 
   const files = allFiles(filesAndCallback);
@@ -278,9 +285,46 @@ function callGambit(options, ...filesAndCallback) {
   const verbose = ((v) => v === undefined ? false : v)(options['-v']);
   function log (...args) { if (verbose) { console.log(...args) } };
 
+  const isLink = options['-link'];
+
   log("calling Gambit, ", ...files, options)
 
-  spawn_gsc( { cwd: cwd, '-link': options['-link'] } , gambit => callback(gambit), ...files);
+  function callCallback (gambit) {
+    if (!isLink) {
+      return callback(gambit);
+    } else {
+      return spawn_gsc(
+        {
+          cwd: gambit.root,
+          temp: gambit.root,
+          '-link': true,
+          gxGambcSharp: options.gxGambcSharp
+        },
+        linkGambit => {
+          if (linkGambit.error) {
+            gambit.error = linkGambit.error;
+            return callback(gambit);
+          }
+
+          gambit.link = linkGambit.outputs[0];
+          return callback(gambit)
+
+
+        },
+        ...gambit.outputs
+      );
+
+    }
+  };
+
+  spawn_gsc(
+    {
+      cwd: cwd,
+      gxGambcSharp: options.gxGambcSharp
+    },
+    callCallback,
+    ...files
+  );
 
   return;
 }
@@ -319,8 +363,14 @@ function loadGxJS(options, ...filesAndCallback) {
     return runit;
   })(options)
 
+  const gxGambcSharp = (o => o === undefined ? true : o === '' ? true : o)(options.gxGambcSharp);
+  options.gxGambcSharp = gxGambcSharp;
+  log('\n\n\gx-gambc#?', options.gxGambcSharp);
+
   const addModuleExports = (e => (e === undefined) ? false : (e === '') ? true : e)(options.exports);
-  const gambitLink = (l => (l === undefined) ? false : (l === '') ? true : l)(options.['-link']);
+
+  const gambitLink = (l => (l === undefined) ? false : (l === '') ? true : l)(options.['-link'])
+  options.['-link'] = gambitLink;
 
 
   function rm_rf (dir) {
@@ -400,17 +450,27 @@ function loadGxJS(options, ...filesAndCallback) {
         }
       })(gambit.outputs);
 
+      let linkAst = false;
+      if (gambit.link !== undefined) {
+        const linkFile = fs.readFileSync(gambit.link, {encoding: 'utf8'})
+        // Change the module init to not need `_gambit`
+        log('Changing mod registry init in', gambit.link)
+        linkAST = changeModInit(
+          ensureAST(linkFile),
+          { verbose: verbose }
+        );
+      }
+
       log('Have', ASTs.length, 'ASTs', 'link?', gambitLink)
       if (!error) {
         try {
-          if (!gambitLink) {
-            // Minimize things in "__GxJS__.*" namespace.
-            // i.e.:  __GxJS.bb1_runtime_23_.name => a.b.name
-            ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
-          } else {
-            // Change the module init to not need `_gambit`
-            log('Changing mod registry init')
-            ASTs = ASTs.map( ast => changeModInit(ast, { verbose: verbose }) )
+          // Minimize things in "__GxJS__.*" namespace.
+          // i.e.:  __GxJS.bb1_runtime_23_.name => a.b.name
+          ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
+
+          if (gambit.link !== undefined ) {
+            ASTs = [linkAST, ...ASTs]
+
           }
 
           // No Undeclared Globals Allowed!!
@@ -439,7 +499,7 @@ function loadGxJS(options, ...filesAndCallback) {
 
 
           // Most modules need a runtime system. By default ours is "gxjs"
-          if (RTSrequire && !gambitLink) {
+          if (RTSrequire && (!gambitLink || gambit.link === undefined)) {
             AST = prependConstRTS(AST, RTSrequire, { verbose: verbose })
           }
 
@@ -467,7 +527,18 @@ function loadGxJS(options, ...filesAndCallback) {
 function gxjsLoader () {
   const callback = this.async()
   const rpath = this.resourcePath
-  const options = this.getOptions();
+
+  const getO = () => {
+    if (typeof this.getOptions === 'function') {
+      return this.getOptions()
+    } else {
+    return getOptions(this)
+    }
+  }
+
+  const options = getO();
+
+  console.log('options', options, getOptions(this))
 
   const cwd = path.dirname(this.resourcePath);
 
@@ -479,7 +550,7 @@ function gxjsLoader () {
   options['-v'] = verbose
   function log (...args) { if (verbose) { console.log(...args) } };
 
-  log("Loading GxJS using gxjsLoader: ", rpath, options)
+  log("\n\n**** Loading GxJS using gxjsLoader: ", rpath, options)
 
   loadGxJS(options, rpath, callback);
 
@@ -1303,8 +1374,6 @@ module.exports = spawn_gxc;
 #+end_src
 
 
-
-
 * ~gsc~ Try again, this time with ~node-pty~.
 :PROPERTIES:
 :CUSTOM_ID: GxJSGsc
@@ -1337,12 +1406,24 @@ function spawn_gsc(opts, callback, ...files) {
   const cwd = opts.cwd;
   const gsc = which.sync('gsc');
 
-  const temp = mktemp.createDirSync('Gambit-XXXX');
+  const verbose = ((v) => v === undefined ? false : v)(opts['-v']);
+  function log (...args) { if (verbose) { console.log(...args) } };
+
+  const temp = (t => t === undefined ? mktemp.createDirSync('Gambit-XXXX') : t)(opts.temp);
 
   const libdir = execSync("gxi -e '(print (car (library-load-path)))'",
                          { encoding: 'utf8', shell: true})
-  const gxGambcSharp = find.fileSync('gx-gambc#.scm', libdir)[0];
-  const incGxGambcSharp = `(include "${gxGambcSharp}")`
+  const gxGambcSharp = (o => {
+    if (o === true) {
+      return find.fileSync('gx-gambc#.scm', libdir)[0];
+    } else {
+      return false
+    }
+  })(opts.gxGambcSharp);
+
+  // console.log("\n\n\n\n SHARTP!", gxGambcSharp, ...files, opts.gxGambcSharp);
+
+  const incGxGambcSharp = gxGambcSharp ? ['-e', `(include "${gxGambcSharp}")`] : []
 
 
   const link = (l => l === undefined ? false : (l !== false))(opts.['-link']);
@@ -1354,7 +1435,7 @@ function spawn_gsc(opts, callback, ...files) {
                 '-repr-module', 'class',
                 '-namespace', '__GxJS_',
                 '-o', temp, outputType,
-                '-e', incGxGambcSharp,
+                ...incGxGambcSharp,
                 ...files]
 
   const names = files.map(f => path.basename(f, path.extname(f)));
@@ -1374,7 +1455,8 @@ function spawn_gsc(opts, callback, ...files) {
 
   let stdout = "";
 
-  console.log('Running', cwd, '$', gsc, args.join(' '));
+  log('Running', cwd, '$', gsc, args.join(' '));
+
   ptyProcess.on('data', function(data) {
     console.log(data); stdout = stdout+data;
   });
@@ -1412,6 +1494,11 @@ module.exports = {
   },
   externals: {
     'node-pty': {  commonjs2: 'node-pty', commonjs: 'node-pty' },
+    // 'which': {  commonjs2: 'which', commonjs: 'which' },
+    // 'find': {  commonjs2: 'find', commonjs: 'find' },
+    'acorn': {  commonjs2: 'acorn', commonjs: 'acorn' },
+    'acorn-walk': {  commonjs2: 'acorn-walk', commonjs: 'acorn-walk' },
+    'astring': {  commonjs2: 'astring', commonjs: 'astring' },
   },
   optimization: {
     minimize: true,

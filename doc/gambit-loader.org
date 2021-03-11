@@ -1,6 +1,7 @@
 #+TITLE: Gambit Loader: Loading ~.scm~ files to JavaScript
 
-*Gambit Scheme* is what we base our meta-dialect off of, and ~gxjs-loader~ takes care of loading a gambit scheme file using the ~gambit-scheme~ runtime.
+*Gambit Scheme* is what we base our meta-dialect off of, and ~gxjs-loader~ takes
+care of loading a gambit scheme file using the ~gambit-scheme~ runtime.
 
 
 * /File/ ~gambit-loader.js~
@@ -15,6 +16,8 @@ function gambitLoader () {
   const options = this.getOptions();
 
   options.gxc = false;
+  options.gxGambcSharp = false;
+
   const cwd = path.dirname(this.resourcePath);
 
   const RTSrequire = (req => req === undefined ? 'gambit-scheme' : req)(options['RTS']);
@@ -86,16 +89,4 @@ module.exports = {
 
   target: 'node'
 };
-#+end_src
-
-* /File/ ~package.json~
-#+begin_src json :tangle ../packages/gambit-loader/package.json
-{
-  "name": "gambit-loader",
-  "version": "0.1.1",
-  "description": "Gambit Scheme to JavaScript loader",
-  "main": "dist/gambit-loader.js",
-  "author": "Drew Crampsie <me@drewc.ca>",
-  "license": "MIT"
-}
 #+end_src

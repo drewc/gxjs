@@ -1,0 +1,13 @@
+{
+  "name": "gerbil-loader",
+  "version": "0.0.0",
+  "description": "A loader from Gerbil Scheme to Javascript",
+  "main": "gerbil-loader.js",
+  "files": ["dist/", "README.md"],
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "MIT",
+  "dependencies": {
+    "gxjs-loader": "^0.0.3"
+  }
+}

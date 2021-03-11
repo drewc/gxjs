@@ -1,0 +1,19 @@
+{
+  "name": "gxjs-tests",
+  "version": "0.0.1",
+  "description": "Gerbil eXtended Scheme JavaScript Tests",
+  "main": "index.js",
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "gambit-loader": "^0.1.1",
+    "gambit-scheme": "^0.0.0",
+    "gxjs": "^0.0.0",
+    "gxjs-loader": "^0.0.3"
+  },
+  "devDependencies": {
+    "loader-runner": "^4.2.0"
+  }
+}

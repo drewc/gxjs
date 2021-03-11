@@ -3,7 +3,6 @@
 Gerbil is a meta-dialect of Scheme with post-modern features. It transpiles to
 [[file:gambit-scheme.org][Gambit]] which can transpile to *Javascript*.
 
-
 #+begin_src shell
 cd packages/ ; mkdir gerbil-scheme/ ; cd gerbil-scheme; yarn init
 yarn run lerna add gxjs-loader packages/gerbil-scheme --dev
@@ -18,6 +17,100 @@ GxJSGambJS(RTS);
 module.exports = RTS;
 
 #+end_src
+
+* Usage
+:PROPERTIES:
+:CUSTOM_ID: GerbilUsage
+:END:
+
+Let's have a ~scheme~ file that uses a few ~js~ features.
+
+Here is ~gambit-scheme-usage.ss~.
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gerbil-scheme-usage.ss
+(import :js)
+
+(js#declaration "console.log('started gerbil scheme!')")
+
+(def (this-is-gerbil!! (val 42))
+  (js#statement "console.log('This is GxJS!', (@1@), (@2@))"
+                val
+                (js#expression "{ foo: 'bar' };")))
+
+(js#statement "console.log('finished gerbil scheme init');
+ module.exports = RTS.scm2host(@1@);" this-is-gerbil!!)
+#+end_src
+
+
+To load an ~.ss~ file, ~gerbil-loader~ is the easy way. The options are the same
+as [[https://www.npmjs.com/package/gxjs-loader][~gxjs-loader~]].
+
+
+Now for a *JavaScript* file, ~gerbil-scheme-usage.js~. We'll make this a
+CommonJS module.
+
+We do not actually need to ~require('gerbil-scheme')~ here at all and we export
+the ~RTS~ is exported pretty much so we can see just that. Just wait :)
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gerbil-scheme-usage.js
+const RTS = require('gerbil-scheme');
+
+const thisIsGerbil = require('gerbil-loader!./gerbil-scheme-usage.ss');
+
+thisIsGerbil('*');
+
+module.exports = RTS;
+#+end_src
+
+That outputs this to the console. As you can see the function automagically
+converts the string into a Gerbil/Gambit string, but this is the JavaScript
+output.
+
+#+begin_src javascript
+started gerbil scheme!
+finished gerbil scheme init
+This is GxJS! { codes: [ 42 ] } { foo: 'bar' }
+#+end_src
+
+
+By default ~gerbil-loader~ automagically requires ~gerbil-scheme~ by prepending ~const RTS = require('gerbil-scheme');~ to the top of the "file".
+
+The ~RTS.glo~ is the symbol table.
+
+#+begin_src scheme :tangle ../packages/gxjs-tests/gerbil-scheme-auto.ss
+(import :js)
+(js#declaration #<<EOF
+console.log('Ok, auto RTS!', Object.keys(RTS.glo).length)
+
+module.exports = RTS;
+
+EOF
+)
+#+end_src
+
+Now we'll use that in a ~js~ module. This time around es6.
+
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/gerbil-scheme-auto.js
+import RTS from './gerbil-scheme-usage.js'
+import sameRTS from 'gerbil-loader!./gerbil-scheme-auto.ss';
+
+console.log('Same Runtime?', RTS === sameRTS);
+
+#+end_src
+
+That outputs the following.
+
+#+begin_src javascript
+started gerbil scheme!
+finished gerbil scheme init
+This is GxJS! { codes: [ 42 ] } { foo: 'bar' }
+Ok, auto RTS! 165
+Same Runtime? true
+#+end_src
+
+So we just need to use ~gerbil-loader~ and have ~gerbil-scheme~ as a dependency
+and there you go.
 
 
 * ~gx-gambc*.scm~, the *Gerbil* bootstrap in *Gambit*
@@ -389,7 +482,7 @@ dispatches on those. Otherwise it does them all.
 
 <<keyword-dispatch>>
 
-(##inline-host-statement "console.log('gambjs-runtime')")
+;;(##inline-host-statement "console.log('gambjs-runtime')")
 #+end_src
 
 

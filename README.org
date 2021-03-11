@@ -48,6 +48,28 @@ yarn add gambit-scheme
 #+end_src
 
 
+* Emacs Indentation and Highlighting
+
+#+begin_src emacs-lisp
+  (defun js-gerbil-syntax ()
+    (interactive)
+
+    ;;(gerbil-put-indent '(.begin .or .any) 0)
+    (gerbil-put-indent '(js\#function)  1)
+    (gerbil-put-indent '({)  2)
+
+    ;;(gerbil-fontlock-add
+     ;;(cons
+      ;;(concat
+       ;;"(" (regexp-opt '(".let*" ".begin" ".begin0" ".or" ".any" ".not")
+       ;;                t)
+       ;;"\\>")
+      ;;;'(1 'font-lock-keyword-face  )))
+
+     )
+
+     (add-hook 'gerbil-mode-hook 'js-gerbil-syntax)
+
 * Footnotes
 
 [fn:1] Ok, likely under 15 or so. But still!

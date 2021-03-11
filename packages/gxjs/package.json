@@ -1,0 +1,16 @@
+{
+  "name": "gxjs",
+  "version": "0.0.0",
+  "description": "GxJS: Gerbil, a Meta-Scheme, for JavaScript runtimes",
+  "main": "dist/gxjs.js",
+  "files": ["dist/", "README.md"],
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "gerbil-scheme": "^0.0.0"
+  },
+  "devDependencies": {
+    "gxjs-loader": "^0.0.3"
+  }
+}

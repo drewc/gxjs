@@ -2,7 +2,11 @@
 
 I think my first package is ready.
 
-* Test it independently
+* First off, ~gxjs-loader~
+
+This one loads scheme files and is used by most others.
+
+** Test it independently
 
 The packages is a part of a monorepo and we do not want to test it there. So create a test directory and make it a package.
 
@@ -87,7 +91,7 @@ yarn run webpack && node --trace-uncaught -e "require ('./dist/main.js')"
 
 It seems to work!!
 
-* Publishing
+** Publishing
 
 First login to NPM
 
@@ -127,8 +131,8 @@ yarn info gxjs-loader
 #+end_src
 
 
-Seems to! Let's test it on it's own.
-
+Seems to! Let's test it on it's own. We need our own runtime that can manage
+what Gerbil wants for our test file.
 
 #+begin_src scheme :tangle /tmp/test-directory/runtime.scm
 (namespace (""))
@@ -185,7 +189,7 @@ EOF
         n)))
 #+end_src
 
-Now make a runtime with it.
+Now make a runtime in JS with it.
 
 #+begin_src javascript :tangle /tmp/test-directory/runtime.js
 const RTS = require('gxjs-loader?-link&return=RTS&exports!./runtime.scm');
@@ -197,7 +201,7 @@ console.log('New RTS:', RTS.glo, RunTime)
 module.exports = RTS;
 #+end_src
 
-A file that uses a runtime
+A file that uses a runtime.
 
 #+begin_src scheme :tangle "/tmp/test-directory/new-index.ss"
 (import :js)
@@ -215,10 +219,10 @@ A file that uses a runtime
                   jso n? s?)))
 (js#statement "module.exports = RTS.scm2host(@1@);" test-jso?)
 #+end_src
-And the ~index.js~
 
+And the ~index.js~ with ~RTS=./runtime.js~.
 
-#+begin_src javascript :tangle "/tmp/test-directory/index.js"
+#+begin_src javascript :tangle "/tmp/test-directory/second-index.js"
 const testJSO = require('gxjs-loader?RTS=./runtime.js!./new-index.ss')
 
 console.log('loaded index.ss', testJSO);
@@ -234,4 +238,59 @@ yarn remove "gxjs-loader"
 
 yard add gxjs-loader
 yarn run webpack && node --trace-uncaught -e "require ('./dist/main.js')"
+#+end_src
+
+ It works!!
+** Add a ~README.md~
+
+The *npm registry* loves a ~README.md~. In the source will be ~README.org~ which we'll export.
+
+** ~files:~ in ~package.json~. We don't want them all!
+
+
+** Rsync to /tmp/ and build
+
+This is to make sure it works by itself.
+
+* Try ~gambit-scheme~
+
+We've got a package that, as far as I can tell, loads the ~gambit-scheme~
+runtime.
+
+Did the files and the README, so let's test it!
+
+#+begin_src shell
+rm -rf /tmp/test-directory/* || mkdir /tmp/test-directory; cd /tmp/test-directory ; yarn init -yp
+#+end_src
+
+#+begin_src shell
+yarn link gambit-scheme
+yarn link gambit-loader
+yarn add webpack webpack-cli
+#+end_src
+
+#+begin_src scheme :tangle /tmp/test-directory/gambit-scheme-usage.scm
+(declare (extended-bindings))
+
+(##inline-host-declaration "console.log('Started Gambit loaded file!')")
+
+
+(define gambit-vector
+  (##vector
+   42 'this "is how we hake the moonshine"))
+
+
+(define (this-is-gambit! #!optional (val 42))
+  (let ((three (##inline-host-expression "{ answer: 42 };")))
+    (##inline-host-statement "console.log('This is Gambit!', (@1@), (@2@), (@3@))"
+                           val gambit-vector three)))
+
+(##inline-host-statement "console.log('finished Gambit-loaded file');
+ module.exports = RTS.scm2host(@1@);" this-is-gambit!)
+#+end_src
+
+#+begin_src javascript :tangle /tmp/test-directory/index.js
+const thisIsGambit = require('gambit-loader!./gambit-scheme-usage.scm');
+
+thisIsGambit(['*Gambit String*', 42]);
 #+end_src

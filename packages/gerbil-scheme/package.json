@@ -1,0 +1,16 @@
+{
+  "name": "gerbil-scheme",
+  "version": "0.0.0",
+  "description": "Gerbil is a meta-dialect of Scheme with post-modern features",
+  "main": "dist/gerbil-scheme.js",
+  "files": ["dist/", "README.md"],
+  "repository": "git@github.com:drewc/gxjs.git",
+  "author": "Drew Crampsie <me@drewc.ca>",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "gambit-scheme": "^0.0.0"
+  },
+  "devDependencies": {
+    "gxjs-loader": "^0.0.4"
+  }
+}

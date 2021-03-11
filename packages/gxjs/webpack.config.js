@@ -2,22 +2,23 @@ const TerserPlugin = require("terser-webpack-plugin");
 const path = require('path');
 
 module.exports = {
-  mode: 'development',
-  // mode: 'production',
-  entry: './gxjs-loader.js',
+  // mode: 'development',
+  mode: 'production',
+  entry: { 'gxjs': './index.js' },
   output: {
     path: path.resolve(__dirname, './dist'),
-    filename: 'gxjs-loader.js',
-    library: 'GxJSLoader',
-    libraryTarget:'umd',
+    filename: '[name].js',
+    library: 'GxJS',
+    libraryTarget: 'umd',
+    globalObject: 'this'
   },
   externals: {
-    'node-pty': {  commonjs2: 'node-pty', commonjs: 'node-pty' },
-    // 'which': {  commonjs2: 'which', commonjs: 'which' },
-    // 'find': {  commonjs2: 'find', commonjs: 'find' },
-    'acorn': {  commonjs2: 'acorn', commonjs: 'acorn' },
-    'acorn-walk': {  commonjs2: 'acorn-walk', commonjs: 'acorn-walk' },
-    'astring': {  commonjs2: 'astring', commonjs: 'astring' },
+    'gambit-scheme': 'commonjs2 gambit-scheme',
+    'gerbil-scheme': 'commonjs2 gerbil-scheme',
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
   },
   optimization: {
     minimize: true,
@@ -39,6 +40,4 @@ module.exports = {
        }
     ]
    },
-
-  target: 'node'
 };

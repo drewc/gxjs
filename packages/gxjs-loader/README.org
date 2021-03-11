@@ -1,0 +1,28 @@
+#+TITLE: GxJS Loader: Load Scheme files into JavaScript
+#+OPTIONS: toc:nil
+
+*GxJS Loader: Load Scheme files into JavaScript*
+
+*GxJS Loader* is used to take either source code written in *Gerbil Gambit* or *Gambit Scheme*
+ scheme and transpile them to *JavaScript*.
+
+* Installation
+
+Easy! I choose ~yarn~, but ~npm~ also works.
+
+#+begin_src shell
+yarn add gxjs-loader --dev
+#+end_src
+
+* Documentation
+
+For details see the repo, man! https://github.com/drewc/gxjs
+
+* Usage
+
+
+#+INCLUDE: "../../doc/gxjs-loader.org::#GxJSLoaderUsage" :only-contents t
+
+* Support
+
+Go to https://github.com/drewc/gxjs/issues or contact the author.

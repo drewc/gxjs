@@ -343,22 +343,14 @@ EOF
 
 #+end_src
 
-* /File/ gambit/lib/list.scm
-
-#+begin_src scheme :tangle ../gambit-scheme/list.scm :mkdirp yes
-(declare (extended-bindings))
-(##define-macro (incl filename)
-  `(##declare-scope
-    (##macro-scope
-     (##namespace-scope
-      (##include ,filename)))))
-
-(incl "~~lib/gambit/list/list.scm")
-#+end_src
 * Universal Library Code: Univ is, what I got
 
 In gambit there's a file, *_t-univ-4.scm* that has ~univ-define-prim~. What is
 does is define primitives for the compiler and linker it seems.
+
+
+
+
 
 
 ** ~eq?~, ~##fx=~
@@ -785,7 +777,9 @@ function vec2list(vec, n=0)  {
 #+end_src
 
 #+begin_src scheme :noweb-ref vector
-;; AUTOMAGIC:  vector?, vector-length, vector-ref, vector-set!
+;; AUTOMAGIC:  vector?, vector-ref, vector-set!
+
+(define-prim (vector-length v) (##inline-host-expression "(@1@).length" v))
 
 (define-prim (##vector . lst) (##list->vector lst))
 (define-prim (vector . lst) (##list->vector lst))
@@ -1272,7 +1266,6 @@ take them out and put them here.
 
 #+end_src
 
-
 ** Numbers!! ~*~, ~/~, ~+~ etc
 
 #+begin_src scheme :noweb-ref num
@@ -1377,7 +1370,7 @@ take them out and put them here.
       const _ret = xs.reduce((a, b) => { return (a == b) ?  b : NaN });
       return !isNaN(_ret)})(RTS.scm2host(@1@));"
    (##list->vector xs)))
-(define-prim = ##=)
+(define-prim (= . xs) (##apply  ##= xs))
 
 (define-prim (##< . xs)
  (##inline-host-expression
@@ -1388,7 +1381,7 @@ take them out and put them here.
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a > b) })(RTS.scm2host(@1@));"
    (##list->vector xs)))
-(define-prim > ##>)
+(define-prim (> . xs) (##apply ##> xs))
 
 
 (define-prim (##<= . xs)
@@ -1517,14 +1510,7 @@ take them out and put them here.
 
 
 #+end_src
-** /File/ ~univ/vector.scm~
-#+begin_src scheme :noweb yes :tangle "../gambit-scheme/universal/vector.scm" :mkdirp t
-(declare (extended-bindings))
-(namespace (""))
-<<vector>>
-#+end_src
-
-
+** Threads??
 ** /File/ ~universal/prim.scm~
 
 #+begin_src scheme :noweb yes :tangle "../packages/gambit-scheme/universal/prim.scm" :mkdirp yes

@@ -319,7 +319,9 @@ function vec2list(vec, n=0)  {
 
 (define-prim (vector->list vec) (##vector->list vec))
 
-;; AUTOMAGIC:  vector?, vector-length, vector-ref, vector-set!
+;; AUTOMAGIC:  vector?, vector-ref, vector-set!
+
+(define-prim (vector-length v) (##inline-host-expression "(@1@).length" v))
 
 (define-prim (##vector . lst) (##list->vector lst))
 (define-prim (vector . lst) (##list->vector lst))
@@ -874,7 +876,7 @@ return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
       const _ret = xs.reduce((a, b) => { return (a == b) ?  b : NaN });
       return !isNaN(_ret)})(RTS.scm2host(@1@));"
    (##list->vector xs)))
-(define-prim = ##=)
+(define-prim (= . xs) (##apply  ##= xs))
 
 (define-prim (##< . xs)
  (##inline-host-expression
@@ -885,7 +887,7 @@ return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
  (##inline-host-expression
    "((xs) => { return xs.reduce((a, b) => a > b) })(RTS.scm2host(@1@));"
    (##list->vector xs)))
-(define-prim > ##>)
+(define-prim (> . xs) (##apply ##> xs))
 
 
 (define-prim (##<= . xs)

@@ -1,0 +1,34 @@
+#+TITLE: Gambit Loader : Use ~gsc~ for Scheme -> JavaScript
+#+OPTIONS: toc:nil
+
+*Gambit Loader : Use ~gsc~ for Scheme -> JavaScript*
+
+The Gambit programming system is a full implementation of the Scheme language
+which conforms to the R4RS, R5RS and IEEE Scheme standards.
+
+The ~gambit-loader~ package allows the loading of a scheme file in a javascript
+environment.
+
+The ~gambit-scheme~ UMD library is one way to have a runtime that works
+alongside it.
+
+* Installation
+
+Easy! I choose ~yarn~, but ~npm~ also works.
+
+#+begin_src shell
+yarn add gambit-loader --dev
+yarn add gambit-scheme
+#+end_src
+
+* Documentation
+
+For details see the repo, man! https://github.com/drewc/gxjs
+
+* Usage
+
+#+INCLUDE: "../../doc/gambit-scheme.org::#GambitSchemeUsage" :only-contents t
+
+* Support
+
+Go to https://github.com/drewc/gxjs/issues or contact the author.

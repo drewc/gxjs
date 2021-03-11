@@ -1,0 +1,33 @@
+#+TITLE: Gerbil Loader: Use ~gxc~ and ~gsc~ load Gerbil to JavaScript
+#+OPTIONS: toc:nil
+
+ *Gerbil Loader: Use ~gxc~ and ~gsc~ load Gerbil to JavaScript*
+
+The ~gerbil-loader~ package makes it easy to load a gerbil file into a
+JavaScript runtime.
+
+The ~gerbil-scheme~ package is based off of [[https://cons.io/][Gerbil]], a scheme written in itself
+that compiles to [[http://gambitscheme.org/][Gambit Scheme]].
+
+The ~gerbil-scheme~ UMD library allows many different uses of that runtime and will at some point allow loading of gerbil modules.
+
+* Installation
+
+Easy! I choose ~yarn~, but ~npm~ also works.
+
+#+begin_src shell
+yarn add gerbil-loader --dev
+yarn add gerbil-scheme
+#+end_src
+
+* Documentation
+
+For details see the repo, man! https://github.com/drewc/gxjs
+
+* Usage
+
+#+INCLUDE: "../../doc/gerbil-scheme.org::#GerbilUsage" :only-contents t
+
+* Support
+
+Go to https://github.com/drewc/gxjs/issues or contact the author.

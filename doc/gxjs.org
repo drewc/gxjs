@@ -2,6 +2,9 @@
 
 
 * Usage
+:PROPERTIES:
+:CUSTOM_ID: GxJSUsage
+:END:
 
 Writing ~js~ applications in *Gerbil* rules! This is what we add.
 
@@ -13,6 +16,25 @@ To make the syntax work all files should import the ~:js~ gerbil module.
 #+begin_src scheme
 (import :js)
 #+end_src
+
+** Loading
+
+When using ~gxjs-loader~ things just happen automagically and rarely do we
+need to cast another spell.
+
+Most of the following code is tangled into a ~test-gxjs.ss~ file. We load that
+in a *JavaScript* file and execute the function.
+
+We'll even make it an ~es~ module with no semicolons in order to be as modern as we want! :)
+
+#+begin_src javascript :tangle ../packages/gxjs-tests/test-gxjs.js
+import testGxJS from 'gxjs-loader!./test-gxjs.ss'
+
+testGxJS()
+
+export default testGxJS;
+#+end_src
+
 
 ** FFI Starting Points: declaration, statement, expression.
 
@@ -27,7 +49,7 @@ For that there are three forms that matter.
  - js#declaration :: A toplevel only form that puts the string passed as a
    toplevel *JavaScript* form.
 
- - js#statement :: A form that if toplevel runs after the file is loaded while
+ - js#statement or js#stmt :: A form that if toplevel runs after the file is loaded while
    the *Gambit Module* is [[file:universal.org::#gambitModInit][initializing]], otherwise runs within the
    function/syntax is it used within. Can take objects as arguments.
 
@@ -134,8 +156,6 @@ Now we can define ~===~ inside the ~namespace: js~
 #+begin_src scheme :noweb-ref js#triple-eq
 (def (=== . args)
   (js#expression "RTS.GxJS.apply_predicate((x,y) => x === y, @1@);" args))
-
-(js#declaration "console.error('HERE!');")
 #+end_src
 
 And test it.
@@ -184,8 +204,6 @@ All ~jso~'s are also a foreign type by default.
 #+end_src
 
 ** ~js#ref~
-
-
 
 We often need to reference properties from things in *JavaScript*. There are many things that have properties and can be ~accessed.with.dots~.
 
@@ -330,15 +348,17 @@ objects in and of themselves.
 conversion the the value. *FFI* really can be funny.
 
 #+begin_src scheme :noweb-ref test-ref-set
-(test> "ref-set! does no conversion"
+(set! second-jso second-jso)
+#;(test> "ref-set! does no conversion"
        (let ((js-string (js#ref second-jso string:)))
-        (set! (js#ref second-jso string:) "Scheme String")
+         (js#statement "console.log('Fooos', (@1@))" js-string)
+         (set! (js#ref second-jso string:) "Scheme String")
 
-        (and (js#expression "typeof @1@ === 'string'" js-string)
-             (js#expression "typeof @1@ === 'object'"
-                            (js#ref second-jso string:))
-             (string=? "Scheme String" (js#ref second-jso string:))
-             (##fx= 13 (##vector-length (js#ref "Scheme String" codes:))))))
+         (and (js#expression "typeof @1@ === 'string'" js-string)
+              (js#expression "typeof @1@ === 'object'"
+                             (js#ref second-jso string:))
+              (string=? "Scheme String" (js#ref second-jso string:))
+              (##fx= 13 (##vector-length (js#ref "Scheme String" codes:))))))
 
 #+end_src
 
@@ -358,8 +378,6 @@ conversion the the value. *FFI* really can be funny.
                               (js#ref second-jso string:)))))
 
 #+end_src
-
-
 
 
 ** ~js#function~ with ~js#this~ and ~js#arguments~
@@ -407,11 +425,11 @@ By default all javascript objects become [[file:universal.org::#jsoForeign][~RTS
 #+end_src
 
 
-** Testing
+* Testing: ~test-gxjs.ss~
 
 
 #+begin_src scheme :tangle ../packages/gxjs-tests/test-gxjs.ss :noweb yes
-(import :js (only-in :gerbil/gambit foreign?))
+(import :js )
 
 <<testGT-function>>
 
@@ -468,7 +486,12 @@ package: #f
   (prefix-in (only-in <MOP> @method) @)
   (only-in :gerbil/gambit foreign?))
 
-(export @method @@method foreign? js#function js#expression js#declaration js#statement)
+(export @method @@method foreign? js#this js#function
+        js#expression js#expr
+        js#declaration js#decl
+        js#statement js#stmt
+
+        js#++)
 
 (defsyntax (@method stx)
   (syntax-case stx ()
@@ -478,15 +501,24 @@ package: #f
 (defsyntax (js#expression stx)
   (syntax-case stx ()
     ((_ str args ...) #'(##inline-host-expression str args ...))))
+(defsyntax (js#expr stx)
+  (syntax-case stx ()
+    ((_ str args ...) #'(##inline-host-expression str args ...))))
 (defsyntax (js#statement stx)
+  (syntax-case stx ()
+    ((_ str args ...) #'(##inline-host-statement str args ...))))
+(defsyntax (js#stmt stx)
   (syntax-case stx ()
     ((_ str args ...) #'(##inline-host-statement str args ...))))
 (defsyntax (js#declaration stx)
   (syntax-case stx ()
     ((_ str) #'(##inline-host-declaration str))))
+(defsyntax (js#decl stx)
+  (syntax-case stx ()
+    ((_ str) #'(##inline-host-declaration str))))
 
 
-(def js#this (##inline-host-expression "globalThis;"))
+(def js#this (##inline-host-expression "{};"))
 (def js#arguments #())
 
 
@@ -509,21 +541,29 @@ package: #f
                               "function (...args) {
   let scmProc = RTS.scm2host(@1@);
   const stack = (() => {
-    const s = {}
+    const s = [];
     for (let key in RTS.stack) {
       s[key] = RTS.stack[key]
     }
     return s;
   })()
   const sp = RTS.sp
-  // console.log('STACK:', RTS.sp,  RTS.stack);
+
+  // console.log('STACK Before scmProc(this, args):', RTS.sp,  RTS.stack);
+  // console.log('our stack', sp , stack);
+
   const ret = scmProc(this, args);
-  // console.log('STACK2dd:', RTS.sp, RTS.stack);
-  RTS.sp = sp;
+
+  // console.log('STACK After Call:', RTS.sp, RTS.stack);
+  // NOTE: this only seems to be when a bunch of FFI happens. Still, works both ways regardless.
+   RTS.sp = sp;
   RTS.stack = stack;
-  // console.log('STACK3', RTS.sp, stack, RTS.stack);
+  // console.log('STACK3', sp, RTS.sp, stack, RTS.stack, stack.length, RTS.stack.length);
+
   return ret;
-   };" (lambda (t a) (fn t a))))))))))
+};" (lambda (t a) (fn t a))))))))))
+
+
 
 (defsyntax (js#++ stx)
   (syntax-case stx ()
@@ -604,9 +644,14 @@ RTS.GxJS.scm2propName = (scm => {
 ** ~ref~ and ~ref-set!~ to make it simple.
 
 Essentially almost every *Gerbil* object are also *JavaScript* objects. Most of
-the time when we have an object we want to reference.
+the time when we have an object we want to reference the properties.
 
 #+begin_src javascript :noweb-ref RTS.GxJS.ref
+RTS.GxJS.camelCase = (string) => {
+    return string.replace( /-([a-z])/ig, function( all, letter ) {
+        return letter.toUpperCase();
+    });
+};
 RTS.GxJS.ref = (obj, ...refs) => {
   if (refs.length === 0) {return obj}
   if (obj instanceof RTS.Foreign) {
@@ -616,7 +661,16 @@ RTS.GxJS.ref = (obj, ...refs) => {
   };
   const ref = RTS.GxJS.scm2propName(refs[0])
   refs = refs.slice(1)
-  return RTS.GxJS.ref(obj[ref], ...refs)
+  const newObj = (o => {
+    // If it is not here, perhaps we are trying.to-use-dashes
+    // when.itShouldBeCamelCase?
+    if (o === undefined) {
+      const newRef = RTS.GxJS.camelCase(ref)
+      // console.log('trying', newRef);
+      return obj[newRef]
+    } else { return o }
+  })(obj[ref]);
+  return RTS.GxJS.ref(newObj, ...refs)
 };
 #+end_src
 
@@ -667,7 +721,7 @@ RTS.GxJS.set_ref = (obj, ...refsAndValue) => {
   const args = (@1@), obj = (@2@)
   const val = args[args.length - 1];
   args[args.length - 1] = RTS.scm2host(val);
-  return RTS.GxJS.set_ref(obj, ...args);
+  return RTS.host2scm(RTS.GxJS.set_ref(obj, ...args));
  })();" (##list->vector keys-and-val) obj))
 #+end_src
 ** ~plist~'s become ~js~ "object"s
@@ -678,9 +732,12 @@ It begins with making it happen in *JavaScript*.
 
 #+begin_src javascript :noweb-ref plist2jso
 RTS.GxJS.plist2jso = function (plist) {
+  if (plist === null) { return {} };
+
   const jso = {}; let scms = [plist] ; const heap = [jso];
 
   function pair2prop (pair = plist) {
+  if (pair === null) { return  };
     const car = pair.car, cdr = pair.cdr;
     // console.log('Trying scm2host for key:', car);
     const propName = (() => {
@@ -699,23 +756,28 @@ RTS.GxJS.plist2jso = function (plist) {
       if (cdr === null) { return cdr; }
       const cadr = (() => (cdr instanceof RTS.Pair) ? cdr.car : cdr)();
       // Have we already made this scm into a properly value?
+
       const idx = scms.findIndex(o => o === cadr);
-      const hostValue = (() => {
-        if (idx > -1)  {
+
+      let hostValue = (() => {
+
+        if (typeof cadr === 'object' && idx > -1)  {
           return heap[idx]
-        } else {
+        } else if (typeof cadr !== 'string' ){
           try {
             return  RTS.scm2host(cadr)
           } catch(e) { return cadr }
-        }
+        } else { return cadr }
       })();
 
       if (idx === -1) { scms.push(cadr); heap.push[hostValue] }
+      if (hostValue === undefined) { hostValue = cadr };
       return hostValue;
     })();
 
     jso[propName] = propValue;
 
+    //  console.log('key', propName, 'value', propValue)
     if (cdr instanceof RTS.Pair && cdr.cdr instanceof RTS.Pair) {
       pair2prop(cdr.cdr)
     }
@@ -746,6 +808,14 @@ Now a constructor that makes a javascript object and a way to test if this is an
   (and (foreign? obj) (##inline-host-expression "(typeof (@1@).val === 'object');" obj)))
 #+end_src
 
+* Predicates
+
+#+begin_src scheme :noweb-ref type-preds
+(def (undefined? obj)
+  (js#expression "(o => o === undefined)(@1@)" obj))
+(def (null? obj)
+  (js#expression "(o => o === null)(@1@)" obj))
+#+end_src
 * Code ~index.js~ and friends
 
 #+begin_src javascript :tangle ../packages/gxjs/index.js
@@ -793,6 +863,8 @@ EOF
 <<js#jso>>
 
 <<js#triple-eq>>
+
+<<type-preds>>
 
 #+end_src
 

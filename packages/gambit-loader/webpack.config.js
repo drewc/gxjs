@@ -3,21 +3,20 @@ const path = require('path');
 
 module.exports = {
   mode: 'development',
-  // mode: 'production',
-  entry: './gxjs-loader.js',
+ // mode: 'production',
+  entry: './gambit-loader.js',
   output: {
     path: path.resolve(__dirname, './dist'),
-    filename: 'gxjs-loader.js',
-    library: 'GxJSLoader',
+    filename: 'gambit-loader.js',
+    library: 'GambitLoader',
     libraryTarget:'umd',
   },
   externals: {
-    'node-pty': {  commonjs2: 'node-pty', commonjs: 'node-pty' },
-    // 'which': {  commonjs2: 'which', commonjs: 'which' },
-    // 'find': {  commonjs2: 'find', commonjs: 'find' },
-    'acorn': {  commonjs2: 'acorn', commonjs: 'acorn' },
-    'acorn-walk': {  commonjs2: 'acorn-walk', commonjs: 'acorn-walk' },
-    'astring': {  commonjs2: 'astring', commonjs: 'astring' },
+    'gxjs-loader': {  commonjs2: 'gxjs-loader', commonjs: 'gxjs-loader' }
+  },
+  devServer: {
+    contentBase: './dist',
+    port: 8484
   },
   optimization: {
     minimize: true,
