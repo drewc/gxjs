@@ -1224,6 +1224,9 @@ module.exports.newEnvironment = newEnvironment;
 
 
 * Syntax in JS: parse to, walk and print ~AST~'s
+:PROPERTIES:
+:CUSTOM_ID: JSParse2AST
+:END:
 
 For parsing the ~js~ we are using *Acorn* : "A tiny, fast JavaScript parser
 written in JavaScript".
@@ -1240,8 +1243,16 @@ specified by the ESTree spec.
 #+end_quote
 
 #+begin_src javascript :noweb-ref parse
-function parse (input, options = {ecmaVersion: 2020}) {
-  return acorn.parse(input, options)
+const defaultParseOptions = {ecmaVersion: 2020 };
+function parse (input, options = {}) {
+  const comments = [];
+  const popts = {...defaultParseOptions, onComment: comments, ...options}
+  const AST = acorn.parse(input, popts);
+
+  AST.$comments = comments;
+  // console.warn('Comments:', comments);
+  return AST;
+
 };
 #+end_src
 

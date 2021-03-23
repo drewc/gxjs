@@ -81,6 +81,12 @@
  };
  
 
+ if (RTS.host_function2scm === undefined) {
+   RTS.host_function2scm === RTS.function2scm
+ }
+ if (RTS.function2scm === undefined) {
+   RTS.function2scm === RTS.host_function2scm
+ }
  RTS.host2scm = function (obj) {
    if (obj === void 0) {
      return void 0;
@@ -99,7 +105,7 @@
      }
    }
    if (typeof obj === "function") {
-     return RTS.host_function2scm(obj);
+     return RTS.function2scm(obj);
    }
    if (typeof obj === "string") {
      return new RTS.ScmString(RTS.str2codes(obj));
