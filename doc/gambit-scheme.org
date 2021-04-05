@@ -167,8 +167,8 @@ const TerserPlugin = require("terser-webpack-plugin");
 const path = require('path');
 
 module.exports = {
-  mode: 'development',
-  // mode: 'production',
+  // mode: 'development',
+  mode: 'production',
   entry: { 'gambit-scheme': './gambit-scheme.js' },
   output: {
     path: path.resolve(__dirname, './dist'),

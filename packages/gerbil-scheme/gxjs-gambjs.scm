@@ -37,6 +37,25 @@
 (define (identity obj)
   obj)
 
+(define (memf proc lst)
+  (let lp ((rest lst))
+    (core-match rest
+      ((hd . tl)
+       (if (proc hd) rest (lp tl)))
+      (else #f))))
+
+(define (find pred lst)
+  (cond
+   ((memf pred lst) => car)
+   (else #f)))
+
+(define (foldl1 f iv lst)
+  (let lp ((rest lst) (r iv))
+    (core-match rest
+      ((x . rest)
+       (lp rest (f x r)))
+      (else r))))
+
 (define make-hash-table make-table)
 (define (make-hash-table-eq . args)
   (apply make-table test: eq? args))

@@ -25,6 +25,8 @@
 (define-prim (##absent-object)
   (macro-absent-obj))
 
+(define-prim (absent-object) (##absent-object))
+
 ;;; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
@@ -282,6 +284,14 @@
     (##apply ##apply proc (cons arg1 rest))
     (##apply proc arg1)))
 
+(define-prim (##symbol->string sym)
+  (##inline-host-expression "(@1@).name"))
+(define-prim (symbol->string sym) (##symbol->string sym))
+
+(define-prim (##string->symbol str))
+
+(define-prim (string->symbol str) (##string->symbol str))
+
 (##inline-host-declaration  "
 RTS.list2vector = function (list) {
    const vec = [];
@@ -315,7 +325,8 @@ function vec2list(vec, n=0)  {
 }
 ")
 (define-prim (##vector->list vec)
-  (##inline-host-expression "RTS.vector2list(@1@); " vec))
+  (let ((lst (##inline-host-expression "RTS.vector2list(@1@); " vec)))
+    (if (null? lst) '() lst)))
 
 (define-prim (vector->list vec) (##vector->list vec))
 
@@ -333,6 +344,89 @@ function vec2list(vec, n=0)  {
 
 (define-prim (##vector-shrink! arg1 arg2))
 (define-prim (vector-shrink! arg1 arg2) (##vector-shrink! arg1 arg2))
+
+(define-prim (##list->values lst)
+  (let loop1 ((x lst) (n 0))
+    (if (##pair? x)
+        (loop1 (##cdr x) (##fx+ n 1))
+        (let ((vals (##make-values n)))
+          (let loop2 ((x lst) (i 0))
+            (if (and (##pair? x)  ;; double check in case another
+                     (##fx< i n)) ;; thread mutates the list
+                (let ((elem (##car x)))
+                  (##values-set! vals i elem)
+                  (loop2 (##cdr x) (##fx+ i 1)))
+                vals))))))
+
+(define-prim (##values->list vals)
+  (let ((start 0)
+        (end (##values-length vals)))
+    (let loop ((lst '()) (i (##fx- end 1)))
+      (if (##fx< i start)
+          lst
+          (loop (##cons (##values-ref vals i) lst) (##fx- i 1))))))
+
+(define-prim (##values
+              #!optional
+              (val1 (macro-absent-obj))
+              (val2 (macro-absent-obj))
+              (val3 (macro-absent-obj))
+              #!rest
+              others)
+  (cond ((##eq? val2 (macro-absent-obj))
+         (if (##eq? val1 (macro-absent-obj))
+             (##values)
+             val1))
+        ((##eq? val3 (macro-absent-obj))
+         (##values val1 val2))
+        ((##null? others)
+         (##values val1 val2 val3))
+        (else
+         (##list->values
+          (##cons val1 (##cons val2 (##cons val3 others)))))))
+
+(define-prim (values
+              #!optional
+              (val1 (macro-absent-obj))
+              (val2 (macro-absent-obj))
+              (val3 (macro-absent-obj))
+              #!rest
+              others)
+  (cond ((##eq? val2 (macro-absent-obj))
+         (if (##eq? val1 (macro-absent-obj))
+           (##values)
+           val1))
+        ((##eq? val3 (macro-absent-obj))
+         (##values val1 val2))
+        ((##null? others)
+         (##values val1 val2 val3))
+        (else
+         (##list->values
+          (##cons val1 (##cons val2 (##cons val3 others)))))))
+
+(define-prim (##call-with-values producer consumer)
+  (let ((results ;; may get bound to a multiple-values object
+         (producer)))
+    (if (##not (##values? results))
+        (consumer results)
+        (let ((len (##values-length results)))
+          (cond ((##fx= len 2)
+                 (consumer (##values-ref results 0)
+                           (##values-ref results 1)))
+                ((##fx= len 3)
+                 (consumer (##values-ref results 0)
+                           (##values-ref results 1)
+                           (##values-ref results 2)))
+                ((##fx= len 0)
+                 (consumer))
+                (else
+                 (##apply consumer (##values->list results))))))))
+
+(define-prim (call-with-values producer consumer)
+  (macro-force-vars (producer consumer)
+    (macro-check-procedure producer 1 (call-with-values producer consumer)
+      (macro-check-procedure consumer 2 (call-with-values producer consumer)
+        (##call-with-values producer consumer)))))`
 
 (define-prim (##make-string k #!optional (fill #\null))
   (##make-string k fill))
@@ -1421,3 +1515,124 @@ return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
       (if (eq? fill (macro-absent-obj))
           (##make-list n)
           (##make-list n fill)))))
+
+(define-prim (##append2 lst1 lst2)
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (if (pair? lst1)
+      (cons (car lst1) (##append2 (cdr lst1) lst2))
+      lst2))
+
+(define-prim (##append-lists lst)
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (if (pair? lst)
+      (let ((rev-lst (reverse lst)))
+        (let loop ((rev-lst (cdr rev-lst)) (result (car rev-lst)))
+          (if (pair? rev-lst)
+              (loop (cdr rev-lst)
+                    (##append2 (car rev-lst) result))
+              result)))
+      '()))
+
+(define-prim (##append
+              #!optional
+              (lst1 (macro-absent-obj))
+              (lst2 (macro-absent-obj))
+              #!rest
+              others)
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+
+  (if (eq? lst2 (macro-absent-obj))
+      (if (eq? lst1 (macro-absent-obj))
+          '()
+          lst1)
+      (##append-lists (cons lst1 (cons lst2 others)))))
+
+(define-prim (append
+              #!optional
+              (lst1 (macro-absent-obj))
+              (lst2 (macro-absent-obj))
+              #!rest
+              others)
+
+  (include "~~lib/gambit/prim/prim#.scm") ;; map fx+ to ##fx+, etc
+  (namespace ("" append)) ;; but not append to ##append
+
+  (define (append-multiple head tail arg-num)
+    (if (null? tail)
+        head
+        (macro-force-vars (head)
+          (if (null? head)
+              (append-multiple (car tail) (cdr tail) (fx+ arg-num 1))
+              (list-expected-check
+               (append-multiple-non-null head
+                                         tail
+                                         arg-num
+                                         (fx+ arg-num 1)))))))
+
+  (define (append-multiple-non-null x lsts arg-num1 arg-num2)
+    ;; x!=(), returns fixnum on error
+    (let ((head (car lsts))
+          (tail (cdr lsts)))
+      (if (null? tail)
+          (append-2-non-null x head arg-num1)
+          (macro-force-vars (head)
+            (if (null? head)
+                (append-multiple-non-null x
+                                          tail
+                                          arg-num1
+                                          (fx+ arg-num2 1))
+                (let ((result
+                       (append-multiple-non-null head
+                                                 tail
+                                                 arg-num2
+                                                 (fx+ arg-num2 1))))
+                  (macro-if-checks
+                   (if (fixnum? result)
+                       result
+                       (append-2-non-null x result arg-num1))
+                   (append-2-non-null x result arg-num1))))))))
+
+  (define (append-2-non-null x y arg-num)
+    ;; x!=(), returns fixnum on error
+    (if (pair? x)
+        (let ((result (cons (car x) '())))
+          (let loop ((last result) (tail (cdr x)))
+            (macro-force-vars (tail)
+              (if (pair? tail)
+                  (let ((next (cons (car tail) '())))
+                    (set-cdr! last next)
+                    (loop next (cdr tail)))
+                  (begin
+                    (set-cdr! last y)
+                    (macro-if-checks
+                     (if (null? tail)
+                         result
+                         arg-num) ;; error: list expected
+                     result))))))
+        (macro-if-checks
+         arg-num ;; error: list expected
+         y)))
+
+  (define (list-expected-check result)
+    (macro-if-checks
+     (if (fixnum? result)
+         (macro-fail-check-list result (append lst1 lst2 . others))
+         result)
+     result))
+
+  (cond ((eq? lst2 (macro-absent-obj))
+         (if (eq? lst1 (macro-absent-obj))
+             '()
+             lst1))
+        ((null? others)
+         (macro-force-vars (lst1)
+           (if (null? lst1)
+               lst2
+               (list-expected-check (append-2-non-null lst1 lst2 1)))))
+        (else
+         (append-multiple lst1 (cons lst2 others) 1))))

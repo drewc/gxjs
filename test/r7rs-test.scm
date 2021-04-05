@@ -397,3 +397,5 @@
 ;; (##inline-host-statement "console.log(@1@)" (error "here"))
 ;; (##inline-host-statement "alert('r7rs')")
 (test-r7rs)
+
+(##inline-host-statement "window.string2list = @1@; window.test2list = g_scm2host(@2@);" (##string->list "asd") (lambda () (vector (equal? (##string->list "foo") (##string->list "foo")) (equal? "foo" "foo") (equal? #\f #\f))))

@@ -2,8 +2,16 @@ const acorn = require("acorn")
 const walk = require("acorn-walk")
 const { generate } = require('astring')
 
-function parse (input, options = {ecmaVersion: 2020}) {
-  return acorn.parse(input, options)
+const defaultParseOptions = {ecmaVersion: 2020 };
+function parse (input, options = {}) {
+  const comments = [];
+  const popts = {...defaultParseOptions, onComment: comments, ...options}
+  const AST = acorn.parse(input, popts);
+
+  AST.$comments = comments;
+  // console.warn('Comments:', comments);
+  return AST;
+
 };
 
 function ensureAST(source, options = {ecmaVersion: 2020}) {

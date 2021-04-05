@@ -46,21 +46,21 @@ with, and need to interact with the *"host"* system.
 
 For that there are three forms that matter.
 
- - js#declaration :: A toplevel only form that puts the string passed as a
-   toplevel *JavaScript* form.
+ - js#decl AKA js#declaration ::  A toplevel only form that puts the string
+   passed as a toplevel *JavaScript* form.
 
- - js#statement or js#stmt :: A form that if toplevel runs after the file is loaded while
-   the *Gambit Module* is [[file:universal.org::#gambitModInit][initializing]], otherwise runs within the
+ - js#statement AKA js#stmt :: A form that if toplevel runs after the file is
+   loaded while the *Gambit Module* is [[file:universal.org::#gambitModInit][initializing]], otherwise runs within the
    function/syntax is it used within. Can take objects as arguments.
 
- - js#expression :: Similar to ~js#statement~ only returns the value of the
-   *JavaScript* form to *Gerbil* as-is.
+ - js#expr AKA js#expression :: Similar to ~js#statement~ only returns the value
+   of the *JavaScript* form to *Gerbil* as-is.
 
 
-So let us define a global variable using ~js#declaration~.
+So let us define a global variable using ~js#decl~.
 
 #+begin_src scheme :noweb-ref test-ffi-sp
-(js#declaration
+(js#decl
  "console.log('Declaring a global variable testGxJS');
   globalThis['testGxJS'] = 42;")
 
@@ -112,7 +112,7 @@ For a predicate, ~js#expression~ has a lot we need. For example, we want to use
 ~js#===~ to compare things.
 
 First, because a lot of scheme predicates can take multiple arguments we'll make
-a ~js#declaration~ that has a function that can turn a binary predicate into a
+a ~js#decl~ that has a function that can turn a binary predicate into a
 n-ary operand.
 
 We'll pass an option that defines what is returned if there are ~0~ or ~1~
@@ -181,27 +181,7 @@ and ~foreign?~.
                 42 "That was a number as a key"))
 
 (test> "jso jso?" (js#jso? jso-jso))
-#+end_src
-
-Even better, there's a ~{}~ syntax that closely resembles JSON only without the
-hockey mask, AKA comma.
-
-
-#+begin_src scheme :noweb-ref test-jso
-(def first-jso { keyword: 42
-                 'symbol "String as value"
-                 "hyphen-or-dash" 'symbol-as-value
-                 42 "That was a number as a key"
-                })
-
-(test> "jso first-jso?" (js#jso? first-jso))
-#+end_src
-
-All ~jso~'s are also a foreign type by default.
-
-#+begin_src scheme :noweb-ref test-jso
-(test> "First JSO is foreign?" (foreign? first-jso))
-#+end_src
+#+end_srcrc
 
 ** ~js#ref~
 
@@ -537,7 +517,7 @@ package: #f
            #'(let ((fn (lambda (this args)
                          (let lbinds
                              (begin (##inline-host-expression "undefined") body ...)))))
-               (js#js->foreign (##inline-host-expression
+              (js#js->foreign (##inline-host-expression
                               "function (...args) {
   let scmProc = RTS.scm2host(@1@);
   const stack = (() => {

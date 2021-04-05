@@ -238,8 +238,9 @@ function loadGxJS(options, ...filesAndCallback) {
         try {
           // Minimize things in "__GxJS__.*" namespace.
           // i.e.:  __GxJS.bb1_runtime_23_.name => a.b.name
-          ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
-
+          if (!verbose ) {
+            ASTs = ASTs.map( ast => minimizeGambitNamespace(ast, { verbose: verbose }));
+          }
           if (gambit.link !== undefined ) {
             ASTs = [linkAST, ...ASTs]
 

@@ -1164,45 +1164,12 @@ Taken from ~_kernel.scm~.
 
 #+end_src
 
-*** ~min/vector.scm~
+*** ~min/vec.scm~
 :PROPERTIES:
 :CUSTOM_ID: minVector
 :END:
 
-#+begin_src scheme :tangle ../gambit/min/vector.scm
-(define-prim-vector-procedures
-  vector
-  0
-  macro-no-force
-  macro-no-check
-  macro-no-check
-  #f
-  #f
-  define-map-and-for-each
-  ##equal?)
-(define-prim-vector-procedures
-  u8vector
-  0
-  macro-force-vars
-  macro-check-exact-unsigned-int8
-  macro-check-exact-unsigned-int8-list
-  macro-test-exact-unsigned-int8
-  ##fail-check-exact-unsigned-int8
-  #f
-  ##fx=)
-
-(define bytevector?        u8vector?)
-(define make-bytevector    make-u8vector)
-(define bytevector         u8vector)
-(define bytevector-length  u8vector-length)
-(define bytevector-u8-ref  u8vector-ref)
-(define bytevector-u8-set! u8vector-set!)
-(define bytevector-copy    u8vector-copy)
-(define bytevector-copy!   u8vector-copy!)
-(define bytevector-append  u8vector-append)
-
-;; (##include "~~/lib/gambit/vector/vector.scm")
-#+end_src
+To reduce the code size all the primitives are in [[file:primitive.org::*Vectors][Vectors]].
 
 *** COMMENT ~min/kernel.scm~
 
@@ -2437,52 +2404,14 @@ Compile time env for define-values.
 #+end_src
 *** ~min/string.scm~
 :PROPERTIES:
-:CUSTOM_ID: minChar
+:CUSTOM_ID: minString
 :END:
 
-*Gambit*, or at least my version as built, has a string module. I like strings. But, it also takes a few MB's of code. I dislike that.
+*Gambit*, or at least my version as built, has a string module. I like strings.
+But, it also takes a few MB's of code. I dislike that.
 
-#+begin_src scheme :tangle ../gambit/min/string.scm
-;; nope, don't do this.
-(##include "~~/lib/gambit/string/string.scm")
-#+end_src
+So here are the primitives: [[file:primitive.org::#primStr][Strings]].
 
-#+begin_src scheme :tangle ../gambit/min/g_string.scm
-
-(##include "~~/lib/gambit/string/string#.scm")
-;;;----------------------------------------------------------------------------
-
-(define-prim-vector-procedures
-  string
-  #\nul
-  macro-force-vars
-  macro-check-char
-  macro-check-char-list
-  macro-test-char
-  ##fail-check-char
-  define-map-and-for-each
-  ##char=?)
-
-;;;----------------------------------------------------------------------------
-
-(define-prim-nary-bool (##string=? str1 str2)
-  #t
-  #t
-  (##string-equal? str1 str2)
-  macro-no-force
-  macro-no-check)
-
-(define-prim-nary-bool (string=? str1 str2)
-  #t
-  #t
-  (##string-equal? str1 str2)
-  macro-force-vars
-  macro-check-string)
-
-
-(##define-macro (list->string . args) `(##list->string ,@args))
-;(##list->string '(1 2))
-#+end_src
 
 *** ~min/char.scm~
 :PROPERTIES:
@@ -2902,82 +2831,8 @@ G_Device = function (fd) {
 
 g_os_debug = false;
 
-"))
+")))
 
- ((python)
-  (##inline-host-declaration "
-
-import os
-import pwd
-import grp
-import stat
-import time
-import errno
-import getpass
-import functools
-
-def g_os_encode_error(exn):
-    e = exn.errno
-    if e == errno.EPERM:
-      return -1
-    elif e == errno.ENOENT:
-        return -2
-    elif e == errno.EINTR:
-        return -5
-    elif e == errno.EIO:
-        return -9
-    elif e == errno.EBADF:
-        return -13
-    elif e == errno.EACCES:
-        return -17
-    elif e == errno.EEXIST:
-        return -35
-    else:
-        return -8888
-
-def g_os_decode_error(code):
-    if code == -1:
-        return 'EPERM (Operation not permitted)'
-    elif code == -2:
-        return 'ENOENT (No such file or directory)'
-    elif code == -4:
-        return 'EINTR (Interrupted system call)'
-    elif code == -5:
-        return 'EIO (Input/output error)'
-    elif code == -9:
-        return 'EBADF (Bad file descriptor)'
-    elif code == -13:
-        return 'EACCES (Permission denied)'
-    elif code == -17:
-        return 'EEXIST (File exists)'
-    elif code == -35:
-        return 'EAGAIN (Resource temporarily unavailable)'
-    else:
-        return 'E??? (unknown error)'
-
-def g_current_time():
-    return time.time()
-
-g_start_time = g_current_time()
-
-def g_set_process_times(vect):
-    elapsed = g_current_time() - g_start_time
-    vect.elems[0] = elapsed
-    vect.elems[1] = 0.0
-    vect.elems[2] = elapsed
-    return vect
-
-class G_Device:
-
-    def __init__(self, fd):
-        self.fd = fd
-
-
-g_os_debug = False
-
-"))
-
- (else))
 (define-prim (##os-condvar-select! devices timeout)
   (##first-argument #f ##feature-port-fields)
   (macro-case-target
@@ -5123,6 +4978,7 @@ return xs.reduce((a, b) => a " js-op " b) })(g_scm2host(@1@));")))
 ;;; Apply.
 
 (define (##apply proc arg1 . rest)
+  (declare (not inline))
   (if (##pair? rest)
 
     (let loop ((prev arg1) (lst rest))
