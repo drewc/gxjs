@@ -1,12 +1,15 @@
 {
   "name": "gambit-loader",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Gambit Scheme to JavaScript loader",
-  "main": "dist/gambit-loader.js",
-  "files": ["dist/", "README.md"],
+  "main": "gambit-loader.js",
+  "files": [
+    "dist/",
+    "README.md"
+  ],
   "author": "Drew Crampsie <me@drewc.ca>",
   "license": "MIT",
-  "dependencies": {
-    "gxjs-loader": "^0.0.4"
+  "devDependencies": {
+    "node-pty": "^0.10.0"
   }
 }

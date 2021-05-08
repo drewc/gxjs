@@ -1,0 +1,5 @@
+prelude: :gerbil/core
+namespace: foo
+
+(%#begin)
+(%#call (%#ref _gx#load-module) (%#quote "foo__0"))

@@ -8,36 +8,34 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, './dist'),
     filename: 'gambit-loader.js',
-    library: 'GambitLoader',
-    libraryTarget:'umd',
   },
   externals: {
-    'gxjs-loader': {  commonjs2: 'gxjs-loader', commonjs: 'gxjs-loader' }
+    'gambit-scheme': {  commonjs2: 'gambit-scheme', commonjs: 'gambit-scheme' }
   },
   devServer: {
     contentBase: './dist',
     port: 8484
   },
-  optimization: {
-    minimize: true,
-    minimizer: [new TerserPlugin({})],
-  },
-   module: {
-     rules: [
-       {
-         test: /\.js$/,
-         exclude: /(node_modules|bower_components)/,
-         use: {
-           loader: 'babel-loader',
-           options: {
-             comments: false,
-             presets: ['@babel/preset-env', 'minify'],
-             //plugins: [["minify-mangle-names", { topLevel: true } ]]
-         }
-        }
-       }
-    ]
-   },
+  // optimization: {
+  //   minimize: true,
+  //   minimizer: [new TerserPlugin({})],
+  // },
+  //  module: {
+  //    rules: [
+  //      {
+  //        test: /\.js$/,
+  //        exclude: /(node_modules|bower_components)/,
+  //        use: {
+  //          loader: 'babel-loader',
+  //          options: {
+  //            comments: false,
+  //            presets: ['@babel/preset-env', 'minify'],
+  //            //plugins: [["minify-mangle-names", { topLevel: true } ]]
+  //        }
+  //       }
+  //      }
+  //   ]
+  //  },
 
   target: 'node'
 };

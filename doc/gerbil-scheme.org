@@ -9,15 +9,180 @@ yarn run lerna add gxjs-loader packages/gerbil-scheme --dev
 yarn run lerna add gambit-scheme packages/gerbil-scheme
 #+end_src
 
-#+begin_src javascript :tangle ../packages/gerbil-scheme/index.js
-const RTS = require('gambit-scheme')
-const GxJSGambJS = require('gxjs-loader?args=["RTS"]&RTS=false&call=false&exports!./gxjs-gambjs.scm');
 
-GxJSGambJS(RTS);
-module.exports = RTS;
+* /File/ ~GerbilScheme.scm~ into a ~gerbil-scheme.js~ UMD
+Primarily, *Gerbil* is implemented in itself. However, to start with, it must be
+built from thin air.
+
+Well, actually, *Gambit* is a thick air, with loads of features.
+
+We use the ~gambit-scheme~ npm package VM.
+
+#+begin_src scheme :tangle ../packages/gerbil-scheme/src/gerbil/runtime/GerbilScheme.scm :noweb yes
+(##include "VM.scm")
+
+
+(define (##vm-primordial-loop)
+  (let lp ()
+    (define proc? (##inline-host-expression "@host2scm@(main_vm.runProcedure)"))
+    (define runMe (if proc? (eval (string->symbol proc?)) #f))
+    (if (procedure? runMe)
+      (begin
+        (##inline-host-statement "main_vm.runProcedure = false")
+        (runMe)))
+    (##heartbeat!)
+    (##thread-sleep! 0.1)
+    (lp)))
+
+(##vm-primordial-loop)
+
 
 #+end_src
 
+** /File/ ~src/gerbil/runtime/VM.scm~
+
+#+begin_src scheme :tangle ../packages/gerbil-scheme/src/gerbil/runtime/VM.scm :noweb yes
+(##include "../../../node_modules/gambit-scheme/VM/VM.scm")
+(##include "gx-gambc.scm")
+(##include "gx-gambc0.scm")
+(##include "gx-gambc1.scm")
+(##include "gx-gambc2.scm")
+#+end_src
+
+
+* The REPL
+
+This does not yet work.
+
+
+** /File/ ~src/gerbil/runtime/REPL.scm~ This needs a lot more includes.
+#+begin_src scheme :tangle ../packages/gerbil-scheme/src/gerbil/runtime/REPL.scm :noweb yes
+(##include "VM.scm")
+(##load-module "../../lib/gerbil/expander__rt")
+(##start-repl-in-VM)
+#+end_src
+
+*** Webpack
+
+
+#+begin_src javascript :tangle "../packages/gerbil-scheme/webpack.gxi.js.config.js" :noweb yes
+const path = require('path');
+const webpack = require('webpack');
+
+<<ignorePath>>
+
+module.exports = {
+  mode: 'production',
+  // mode: 'development',
+  target: 'node',
+  entry: {'gxi': './src/gerbil/runtime/REPL.scm' },
+  plugins: [ignorePath,
+            new webpack.BannerPlugin({ banner: "#!/usr/bin/env node", raw: true })],
+  output: {
+     path: path.resolve(__dirname, './bin'),
+     filename: '[name].js',
+  },
+  externals: {
+  //   'fs': 'commonjs2 fs',
+    'posix': 'commonjs2 posix',
+  //   'child_process': 'commonjs2 child_process',
+  //   'buffer': 'commonjs2 buffer',
+  // },
+  // optimization: {
+  //   minimize: true,
+  //   minimizer: [new TerserPlugin({})],
+  },
+   module: {
+     rules: [
+       { test: /\.scm$/,
+         use: [
+          {
+            loader: 'gambit-scheme/VM/loader.js',
+            options: {
+              '-e' : '(include "gx-gambc#.scm")',
+              '-exe' : true,
+              '-v' : true,
+              terser: false
+            },
+          },
+        ],
+       },
+    ]
+   },
+};
+
+#+end_src
+
+
+** Webpack it up
+
+It seems that at compile time webpack sees it as a request for ~.~, which does
+not exist. We get:
+  : Critical dependency: the request of a dependency is an expression.
+
+We ignore that as we use require at runtime for node.js only.
+
+#+begin_src javascript :noweb-ref ignorePath
+ const ignorePath = new webpack.ContextReplacementPlugin(
+      /^\.$/,
+      (data) => {
+        delete data.dependencies[0].critical;
+        return data;
+      }
+)
+#+end_src
+
+#+begin_src javascript :tangle "../packages/gerbil-scheme/webpack.VM.config.js" :noweb yes
+const path = require('path');
+const webpack = require('webpack');
+
+
+<<ignorePath>>
+
+module.exports = {
+  mode: 'production',
+  entry: {'GerbilScheme': './src/gerbil/runtime/GerbilScheme.scm' },
+  plugins: [ignorePath],
+  output: {
+    path: path.resolve(__dirname, ''),
+    filename: 'gerbil-scheme.js',
+    library: 'GerbilScheme',
+    libraryTarget: 'umd',
+    globalObject: 'this'
+
+  },
+  externals: {
+    'fs': 'commonjs2 fs',
+    'posix': 'commonjs2 posix',
+    'child_process': 'commonjs2 child_process',
+    'buffer': 'commonjs2 buffer',
+  },
+  // optimization: {
+  //   minimize: true,
+  //   minimizer: [new TerserPlugin({})],
+  // },
+   module: {
+     rules: [
+       { test: /\.scm$/,
+         use: [
+          {
+            loader: 'gambit-scheme/VM/loader.js',
+            options: {
+              /* ... */
+              '-e' : '(include "gx-gambc#.scm")',
+              //terser: false,
+              '-v': true
+            },
+          },
+        ],
+       },
+    ]
+   },
+};
+
+
+
+#+end_src
 * Usage
 :PROPERTIES:
 :CUSTOM_ID: GerbilUsage
