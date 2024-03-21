@@ -1,7 +1,7 @@
 namespace: #f
 package: #f
 (import
-  (prefix-in (only-in <MOP> @method) @)
+  (prefix-in (only-in :gerbil/core/mop @method) @)
   (only-in :gerbil/gambit foreign?))
 
 (export @method @@method foreign? js#this js#function
